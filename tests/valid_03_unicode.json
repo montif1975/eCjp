@@ -1,0 +1,6 @@
+{
+  "smile": "😀",
+  "escaped": "Line1\nLine2\tTabbed",
+  "quote": "\"Dentro le virgolette\"",
+  "unicode_escape": "\u2764"
+}

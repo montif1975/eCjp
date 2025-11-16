@@ -1,0 +1,8 @@
+{
+  "int": 42,
+  "negative": -7,
+  "fractional": 3.1415,
+  "exp": 6.022e23,
+  "negativeExp": -1E-2,
+  "zero": 0
+}
