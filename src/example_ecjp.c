@@ -213,28 +213,28 @@ int main(int argc, char *argv[])
     
     ret = ecjp_dummy();
     if (ret != ECJP_NO_ERROR) {
-        fprintf(stderr, "ljp_dummy() failed with error code: %d\n", ret);
+        fprintf(stderr, "ecjp_dummy() failed with error code: %d\n", ret);
     }
     else {
-        fprintf(stdout, "ljp_dummy() succeeded.\n");
+        fprintf(stdout, "ecjp_dummy() succeeded.\n");
     }
 
     major = minor = patch = 0;
     ret = ecjp_get_version(&major, &minor, &patch);
     if (ret != ECJP_NO_ERROR) {
-        fprintf(stderr, "ljp_get_version() failed with error code: %d\n", ret);
+        fprintf(stderr, "ecjp_get_version() failed with error code: %d\n", ret);
     }
     else {
-        fprintf(stdout, "ljp_get_version() succeeded. Version: %d.%d.%d\n", major, minor, patch);
+        fprintf(stdout, "ecjp_get_version() succeeded. Version: %d.%d.%d\n", major, minor, patch);
     }
 
     memset(version_string, 0, sizeof(version_string));
     ret = ecjp_get_version_string(version_string, sizeof(version_string));
     if (ret != ECJP_NO_ERROR) {
-        fprintf(stderr, "ljp_get_version_string() failed with error code: %d\n", ret);
+        fprintf(stderr, "ecjp_get_version_string() failed with error code: %d\n", ret);
     }
     else {
-        fprintf(stdout, "ljp_get_version_string() succeeded. Version string: %s\n", version_string);
+        fprintf(stdout, "ecjp_get_version_string() succeeded. Version string: %s\n", version_string);
     }
 
     // check arguments and open test files
@@ -259,9 +259,9 @@ int main(int argc, char *argv[])
                     fprintf(stdout, "\nTesting JSON file (%s) of size %ld bytes:\n", argv[1], file_size);
                     ret = ecjp_check_syntax(ptr,&err_pos, &key_list);
                     if (ret != ECJP_NO_ERROR) {
-                        fprintf(stderr, "ljp_check_syntax() on JSON file: FAILED with error code: %d\n", ret);
+                        fprintf(stderr, "ecjp_check_syntax() on JSON file: FAILED with error code: %d\n", ret);
                         if (err_pos >= 0) {
-                            fprintf(stderr, "ljp_check_syntax(): Error position: %d\n", err_pos);
+                            fprintf(stderr, "ecjp_check_syntax(): Error position: %d\n", err_pos);
                             if(err_pos >= 1024) {
                                 fprintf(stderr, "Error position is beyond 1024 characters, showing context around error:\n");
                                 int start_pos = err_pos - 512;
@@ -281,7 +281,7 @@ int main(int argc, char *argv[])
                         return -1;
                     }
                     else {
-                        fprintf(stdout, "ljp_check_syntax() on JSON file: SUCCEEDED.\n");
+                        fprintf(stdout, "ecjp_check_syntax() on JSON file: SUCCEEDED.\n");
                         if (key_list != NULL) {
                             ecjp_print_keys(ptr, key_list);
 #ifdef TEST_KEY_FIND
