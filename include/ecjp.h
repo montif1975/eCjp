@@ -40,6 +40,13 @@ typedef struct key_elem {
 } ecjp_key_elem_t;
 
 typedef enum {
+    ECJP_ST_NULL,
+    ECJP_ST_OBJ,
+    ECJP_ST_ARRAY,
+    ECJP_ST_MAX
+} ecjp_struct_type_t;
+
+typedef enum {
     ECJP_NO_ERROR = 0,
     ECJP_GENERIC_ERROR,
     ECJP_BRACKETS_MISSING,
@@ -77,12 +84,18 @@ typedef union  {
         };
 } ecjp_flags_t;
 
-typedef struct ljp_parse_stack_item {
+typedef struct ecjp_parse_stack_item {
     char char_value[ECJP_MAX_PARSE_STACK_DEPTH];
     int top;
 } ecjp_parse_stack_item_t;
 
-typedef struct ljp_parser_data {
+typedef struct ecjp_check_result {
+    int                 err_pos;
+    ECJP_TYPE_POS_KEY   num_keys;
+    ecjp_struct_type_t  struct_type;
+} ecjp_check_result_t;
+
+typedef struct ecjp_parser_data {
     int index;
     int status;
     int open_brackets;
@@ -104,7 +117,7 @@ typedef enum {
     ECJP_TYPE_MAX_TYPES  
 } ecjp_value_type_t;
 
-typedef struct ljp_outdata {
+typedef struct ecjp_outdata {
     ecjp_return_code_t  error_code;
     ECJP_TYPE_POS_KEY   last_pos;
     ECJP_TYPE_LEN_KEY   length;
@@ -113,7 +126,7 @@ typedef struct ljp_outdata {
     unsigned int        value_size;
 } ecjp_outdata_t;
 
-typedef struct ljp_indata {
+typedef struct ecjp_indata {
     char                key[ECJP_MAX_KEY_LEN];
     ecjp_value_type_t   type;
     ECJP_TYPE_POS_KEY   pos;
@@ -142,7 +155,9 @@ ecjp_value_type_t ecjp_get_key(const char input[], char *key, ecjp_key_elem_t **
 ecjp_return_code_t ecjp_get_keys(const char input[],char *key,ecjp_key_elem_t **key_list,ecjp_outdata_t *out);
 ecjp_return_code_t ecjp_read_key(const char input[],ecjp_indata_t *in,ecjp_outdata_t *out);
 ecjp_value_type_t ecjp_get_key_and_value(const char input[], char *key, ecjp_key_elem_t **key_list, void *value, size_t value_size);
-ecjp_return_code_t ecjp_check_syntax(const char *input, int *err_pos,ecjp_key_elem_t **key_list);
+ecjp_return_code_t ecjp_check_and_load(const char *input, ecjp_key_elem_t **key_list, ecjp_check_result_t *res);
+ecjp_return_code_t ecjp_check_syntax(const char *input, ecjp_check_result_t *res);
+ecjp_return_code_t ecjp_load(const char *input, ecjp_key_elem_t **key_list, ecjp_check_result_t *res);
 
 #ifdef __cplusplus
 }

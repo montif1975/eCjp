@@ -41,7 +41,7 @@ $(LIB_TARGET): $(LIB_OBJ)
 	$(CC) $(LDFLAGS) -o $@ $^
 
 $(EXAMPLE_TARGET): $(EXAMPLE_OBJ)
-	@echo "Linking example $@..." 
+	@echo "Linking $@..." 
 	$(CC) -o $(EXAMPLE_TARGET) $< $(EXAMPLE_LDFLAGS)
 
 clean:
