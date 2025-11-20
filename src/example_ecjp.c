@@ -261,7 +261,11 @@ int main(int argc, char *argv[])
                     ptr[read_bytes] = '\0';
                     fclose(f);
                     fprintf(stdout, "\nTesting JSON file (%s) of size %ld bytes:\n", argv[1], file_size);
+#if 0                    
                     ret = ecjp_check_and_load(ptr,&key_list,&results);
+#else
+                    ret = ecjp_check_syntax(ptr,&results);
+#endif
                     if (ret != ECJP_NO_ERROR) {
                         fprintf(stderr, "ecjp_check_syntax() on JSON file: FAILED with error code: %d\n", ret);
                         if (results.err_pos >= 0) {
@@ -287,17 +291,19 @@ int main(int argc, char *argv[])
                     else {
                         fprintf(stdout, "ecjp_check_syntax() on JSON file: SUCCEEDED.\n");
                         fprintf(stdout, "ecjp_check_syntax() - num. keys found = %d, struct type = %d.\n",results.num_keys,results.struct_type);
-                        if (key_list != NULL) {
-                            ecjp_print_keys(ptr, key_list);
+                        if (results.num_keys != 0) {
+                            if (key_list != NULL) {
+                                    ecjp_print_keys(ptr, key_list);
 #ifdef TEST_KEY_FIND
-                            // Test key finding
-//                            print_all_key_and_value(ptr, key_list);
-                            print_keys_and_value(ptr,key_list);
-//                            print_all_keys(ptr,key_list);
-//                            print_all_specific_key(ptr,key_list);
+                                    // Test key finding
+//                                  print_all_key_and_value(ptr, key_list);
+                                    print_keys_and_value(ptr,key_list);
+//                                  print_all_keys(ptr,key_list);
+//                                  print_all_specific_key(ptr,key_list);
 #endif
-                            print_and_free_key_list(&key_list);
-                        }   
+                                    print_and_free_key_list(&key_list);
+                                }    
+                        }
                     }
                     free(ptr);
                     ptr = NULL;

@@ -1076,17 +1076,19 @@ ecjp_return_code_t ecjp_check_and_load(const char *input, ecjp_key_elem_t **key_
                         // Record key type
                         key_token.type = ECJP_TYPE_OBJECT;
                         // Add key token to the list
-                        if (ecjp_add_node_end(key_list, &key_token) != 0) {
-                            res->err_pos = p->index;
-                            ecjp_printf("%s - %d: Failed to add key token to the list\n", __FUNCTION__,__LINE__);
-                            return ECJP_GENERIC_ERROR;
-                        } else {
+                        if (key_list != NULL)
+                        {
+                            if (ecjp_add_node_end(key_list, &key_token) != 0) {
+                                res->err_pos = p->index;
+                                ecjp_printf("%s - %d: Failed to add key token to the list\n", __FUNCTION__,__LINE__);
+                                return ECJP_GENERIC_ERROR;
+                            } else {
 #ifdef DEBUG_VERBOSE
-                            ecjp_printf("%s - %d: Added object key token to the list, key_list = %p\n", __FUNCTION__,__LINE__, (void *)*key_list);
+                                ecjp_printf("%s - %d: Added object key token to the list, key_list = %p\n", __FUNCTION__,__LINE__, (void *)*key_list);
 #endif
-                            res->num_keys++;
+                                res->num_keys++;
+                            }
                         }
-
                         // Reset key_token for future keys
                         memset(&key_token, 0, sizeof(ecjp_key_token_t));
                         break;
@@ -1102,15 +1104,18 @@ ecjp_return_code_t ecjp_check_and_load(const char *input, ecjp_key_elem_t **key_
                         // Record key type
                         key_token.type = ECJP_TYPE_ARRAY;
                         // Add key token to the list
-                        if (ecjp_add_node_end(key_list, &key_token) != 0) {
-                            res->err_pos = p->index;
-                            ecjp_printf("%s - %d: Failed to add key token to the list\n", __FUNCTION__,__LINE__);
-                            return ECJP_GENERIC_ERROR;
-                        } else {
+                        if (key_list != NULL)
+                        {
+                            if (ecjp_add_node_end(key_list, &key_token) != 0) {
+                                res->err_pos = p->index;
+                                ecjp_printf("%s - %d: Failed to add key token to the list\n", __FUNCTION__,__LINE__);
+                                return ECJP_GENERIC_ERROR;
+                            } else {
 #ifdef DEBUG_VERBOSE
-                            ecjp_printf("%s - %d: Added object key token to the list, key_list = %p\n", __FUNCTION__,__LINE__, (void *)*key_list);
+                                ecjp_printf("%s - %d: Added object key token to the list, key_list = %p\n", __FUNCTION__,__LINE__, (void *)*key_list);
 #endif
-                            res->num_keys++;
+                                res->num_keys++;
+                            }
                         }
                         // Reset key_token for future keys
                         memset(&key_token, 0, sizeof(ecjp_key_token_t));
@@ -1122,15 +1127,18 @@ ecjp_return_code_t ecjp_check_and_load(const char *input, ecjp_key_elem_t **key_
                         // Record key type
                         key_token.type = ECJP_TYPE_STRING;
                         // Add key token to the list
-                        if (ecjp_add_node_end(key_list, &key_token) != 0) {
-                            res->err_pos = p->index;
-                            ecjp_printf("%s - %d: Failed to add key token to the list\n", __FUNCTION__,__LINE__);
-                            return ECJP_GENERIC_ERROR;
-                        } else {
+                        if (key_list != NULL)
+                        {
+                            if (ecjp_add_node_end(key_list, &key_token) != 0) {
+                                res->err_pos = p->index;
+                                ecjp_printf("%s - %d: Failed to add key token to the list\n", __FUNCTION__,__LINE__);
+                                return ECJP_GENERIC_ERROR;
+                            } else {
 #ifdef DEBUG_VERBOSE
-                            ecjp_printf("%s - %d: Added object key token to the list, key_list = %p\n", __FUNCTION__,__LINE__, (void *)*key_list);
+                                ecjp_printf("%s - %d: Added object key token to the list, key_list = %p\n", __FUNCTION__,__LINE__, (void *)*key_list);
 #endif
-                            res->num_keys++;
+                                res->num_keys++;
+                            }
                         }
                         // Reset key_token for future keys
                         memset(&key_token, 0, sizeof(ecjp_key_token_t));
@@ -1147,15 +1155,18 @@ ecjp_return_code_t ecjp_check_and_load(const char *input, ecjp_key_elem_t **key_
                                 key_token.type = ECJP_TYPE_NULL;
                             }
                             // Add key token to the list
-                            if (ecjp_add_node_end(key_list, &key_token) != 0) {
-                                res->err_pos = p->index;
-                                ecjp_printf("%s - %d: Failed to add key token to the list\n", __FUNCTION__,__LINE__);
-                                return ECJP_GENERIC_ERROR;
-                            } else {
+                            if (key_list != NULL)
+                            {
+                                if (ecjp_add_node_end(key_list, &key_token) != 0) {
+                                    res->err_pos = p->index;
+                                    ecjp_printf("%s - %d: Failed to add key token to the list\n", __FUNCTION__,__LINE__);
+                                    return ECJP_GENERIC_ERROR;
+                                } else {
 #ifdef DEBUG_VERBOSE
-                                ecjp_printf("%s - %d: Added object key token to the list, key_list = %p\n", __FUNCTION__,__LINE__, (void *)*key_list);
+                                    ecjp_printf("%s - %d: Added object key token to the list, key_list = %p\n", __FUNCTION__,__LINE__, (void *)*key_list);
 #endif
-                                res->num_keys++;
+                                    res->num_keys++;
+                                }
                             }
                             // Reset key_token for future keys
                             memset(&key_token, 0, sizeof(ecjp_key_token_t));
@@ -1172,15 +1183,18 @@ ecjp_return_code_t ecjp_check_and_load(const char *input, ecjp_key_elem_t **key_
                             // Record key type
                             key_token.type = ECJP_TYPE_NUMBER;
                             // Add key token to the list
-                            if (ecjp_add_node_end(key_list, &key_token) != 0) {
-                                res->err_pos = p->index;
-                                ecjp_printf("%s - %d: Failed to add key token to the list\n", __FUNCTION__,__LINE__);
-                                return ECJP_GENERIC_ERROR;
-                            } else {
+                            if (key_list != NULL)
+                            {
+                                if (ecjp_add_node_end(key_list, &key_token) != 0) {
+                                    res->err_pos = p->index;
+                                    ecjp_printf("%s - %d: Failed to add key token to the list\n", __FUNCTION__,__LINE__);
+                                    return ECJP_GENERIC_ERROR;
+                                } else {
 #ifdef DEBUG_VERBOSE
-                                ecjp_printf("%s - %d: Added object key token to the list, key_list = %p\n", __FUNCTION__,__LINE__, (void *)*key_list);
+                                    ecjp_printf("%s - %d: Added object key token to the list, key_list = %p\n", __FUNCTION__,__LINE__, (void *)*key_list);
 #endif  
-                                res->num_keys++;
+                                    res->num_keys++;
+                                }
                             }
                             // Reset key_token for future keys
                             memset(&key_token, 0, sizeof(ecjp_key_token_t));
