@@ -6,7 +6,7 @@ CC = gcc
 #CFLAGS = -Wall -I. -I./include -fPIC -O2
 CFLAGS = -Wall -I. -I./include -fPIC -g -O0
 LDFLAGS = -shared
-EXAMPLE_LDFLAGS = -Wl,-rpath=. -L. -L$(BUILD) -l$(LIB)
+EXE_LDFLAGS = -Wl,-rpath=. -L. -L$(BUILD) -l$(LIB)
 
 SRC = src
 EXAMPLE = example
@@ -23,6 +23,9 @@ EXAMPLE_SRC = $(SRC)/$(EXAMPLE).c
 EXAMPLE_OBJ = $(BUILD)/$(EXAMPLE).o	
 EXAMPLE_TARGET = $(BUILD)/$(EXAMPLE)
 
+TEST_SOURCES := $(wildcard $(SRC)/test_*.c)
+TEST_TARGETS := $(patsubst $(SRC)/%.c,$(BUILD)/%,$(TEST_SOURCES))
+
 $(BUILD):
 	mkdir -p $(BUILD)
 
@@ -30,7 +33,9 @@ lib: $(LIB_TARGET)
 
 example: $(EXAMPLE_TARGET)
 
-all: lib example
+tests : $(TEST_TARGETS)
+
+all: lib example tests
 
 $(BUILD)/%.o: $(SRC)/%.c | $(BUILD)
 	@echo "Compiling $<..."
@@ -42,7 +47,14 @@ $(LIB_TARGET): $(LIB_OBJ)
 
 $(EXAMPLE_TARGET): $(EXAMPLE_OBJ)
 	@echo "Linking $@..." 
-	$(CC) -o $(EXAMPLE_TARGET) $< $(EXAMPLE_LDFLAGS)
+	$(CC) -o $(EXAMPLE_TARGET) $< $(EXE_LDFLAGS)
+
+# Compila ogni test separatamente
+$(BUILD)/%: $(SRC)/%.c | $(BUILD)
+	@echo "Compiling $<..."
+	$(CC) $(CFLAGS) -c $< -o $@.o
+	@echo "Linking $@..."
+	$(CC) -o $@ $@.o $(EXE_LDFLAGS)
 
 clean:
 	rm -rf $(BUILD)

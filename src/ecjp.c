@@ -2,11 +2,13 @@
 
 #if DEBUG
 #define ecjp_printf(format, ...)    printf(format, __VA_ARGS__)
+#define ecjp_print(format)          printf(format)
 #else
 #define ecjp_printf(format, ...)
+#define ecjp_print(format)
 #endif
 
-char *ljp_type[ECJP_TYPE_MAX_TYPES] = {
+char *ecjp_type[ECJP_TYPE_MAX_TYPES] = {
     "UNDEFINED",
     "STRING",
     "NUMBER",
@@ -128,20 +130,20 @@ int ecjp_add_node_end(ecjp_key_elem_t **head, ecjp_key_token_t *data)
 void ecjp_print_check_summary(ecjp_parser_data_t *p)
 {
     ecjp_flags_t flags = p->flags;
-    ecjp_printf("Parsing summary:%s\n","");
+    ecjp_print("Parsing summary:\n");
     ecjp_printf("  Total characters processed: %d\n", p->index);
     ecjp_printf("  Final parser status: %d\n", p->status);
     ecjp_printf("  Total objects: %d\n", p->num_objects);
     ecjp_printf("  Total arrays: %d\n", p->num_arrays);
     ecjp_printf("  Final open brackets count: %d\n", p->open_brackets);
     ecjp_printf("  Final open square brackets count: %d\n", p->open_square_brackets);
-    ecjp_printf("Flags status:%s\n","");
+    ecjp_print("Flags status:\n");
     ecjp_printf("  in_string: %d\n", flags.in_string);
     ecjp_printf("  in_key: %d\n", flags.in_key);
     ecjp_printf("  in_value: %d\n", flags.in_value);
     ecjp_printf("  in_number: %d\n", flags.in_number);
     ecjp_printf("  trailing_comma: %d\n", flags.trailing_comma);
-    ecjp_printf("Stack:%s\n","");
+    ecjp_print("Stack:\n");
     ecjp_printf("  Stack top index: %d\n", p->parse_stack.top);
     return;
 };
@@ -151,7 +153,7 @@ void ecjp_print_check_summary(ecjp_parser_data_t *p)
 // External function definitions
 ecjp_return_code_t ecjp_dummy(void)
 {
-    fprintf(stderr, "Hello ecjp library!\n");
+    ecjp_printf("%s: Hello ecjp library!\n",__FUNCTION__);
     return ECJP_NO_ERROR;
 };
 
@@ -211,12 +213,12 @@ ecjp_return_code_t ecjp_show_error(const char *input, int err_pos)
     for (i = 0; i <= row; i++) {
         remain = strlen(input_no_newline) - (i * ECJP_MAX_PRINT_COLUMNS);
         remain = (remain > ECJP_MAX_PRINT_COLUMNS) ? ECJP_MAX_PRINT_COLUMNS : remain;
-        fprintf(stderr, "%.*s\n",remain, &input_no_newline[i * ECJP_MAX_PRINT_COLUMNS]);
+        ecjp_printf("%.*s\n",remain, &input_no_newline[i * ECJP_MAX_PRINT_COLUMNS]);
         if(i == err_row) {
             for (j = 0; j < err_column; j++) {
-                fprintf(stderr, "-");
+                ecjp_print("-");
             }
-            fprintf(stderr, "^\n");
+            ecjp_print("^\n");
         }
     }
     return ECJP_NO_ERROR;
@@ -232,14 +234,12 @@ ecjp_return_code_t ecjp_print_keys(const char *input, ecjp_key_elem_t *key_list)
         return ECJP_NULL_POINTER;
 
     while (current != NULL) {
-#if DEBUG        
         if(current->key.length >= ECJP_MAX_KEY_LEN) {
-            fprintf(stdout, "  Key length exceeds maximum buffer size (%d), truncating output.\n", ECJP_MAX_KEY_LEN - 1);
+            ecjp_printf("Key length exceeds maximum buffer size (%d), truncating output.\n", ECJP_MAX_KEY_LEN - 1);
         }
-#endif
         memset(buffer, 0, sizeof(buffer));
         strncpy(buffer, &input[current->key.start_pos], (current->key.length < ECJP_MAX_KEY_LEN) ? current->key.length : (ECJP_MAX_KEY_LEN - 1));
-        ecjp_printf("%s - %d: Key #%d: %s - Type: %s\n",__FUNCTION__,__LINE__,key_index,buffer,ljp_type[current->key.type]);
+        ecjp_printf("%s - %d: Key #%d: %s - Type: %s\n",__FUNCTION__,__LINE__,key_index,buffer,ecjp_type[current->key.type]);
 
         current = current->next;
         key_index++;
@@ -281,11 +281,9 @@ ecjp_value_type_t ecjp_get_key(const char input[], char *key, ecjp_key_elem_t **
     }
 
     while (current != NULL) {
-#if DEBUG
         if(current->key.length >= ECJP_MAX_KEY_LEN) {
             ecjp_printf("%s - %d: Key length exceeds maximum buffer size (%d), truncating output.\n",__FUNCTION__,__LINE__,(ECJP_MAX_KEY_LEN - 1));
         }
-#endif
         memset(buffer, 0, sizeof(buffer));
         len = (current->key.length < ECJP_MAX_KEY_LEN) ? current->key.length : (ECJP_MAX_KEY_LEN - 1);
         strncpy(buffer, &input[current->key.start_pos], len);
@@ -332,9 +330,7 @@ ecjp_return_code_t ecjp_get_keys(const char input[],char *key,ecjp_key_elem_t **
     
     while (current != NULL) {
         if(current->key.length >= ECJP_MAX_KEY_LEN) {
-#if DEBUG
             ecjp_printf("%s - %d: Key length exceeds maximum buffer size (%d), truncating output.\n",__FUNCTION__,__LINE__,(ECJP_MAX_KEY_LEN - 1));
-#endif
         }
         memset(buffer, 0, sizeof(buffer));
         len = (current->key.length < ECJP_MAX_KEY_LEN) ? current->key.length : (ECJP_MAX_KEY_LEN - 1);
@@ -405,9 +401,7 @@ ecjp_return_code_t ecjp_read_key(const char input[],ecjp_indata_t *in,ecjp_outda
     }
 
     if(out->value == NULL || out->value_size == 0) {
-#if DEBUG
         ecjp_printf("%s - %d: No buffer supplied for store value\n", __FUNCTION__,__LINE__);
-#endif
         out->error_code = ECJP_NO_SPACE_IN_BUFFER_VALUE;
         ret = out->error_code;
         return ret;
@@ -550,7 +544,7 @@ ecjp_return_code_t ecjp_read_key(const char input[],ecjp_indata_t *in,ecjp_outda
     out->length = in->lenght;
 
 #ifdef DEBUG_VERBOSE
-    ecjp_printf("%s - %d: Find key %s of type %s with value: %s\n",__FUNCTION__,__LINE__,in->key,ljp_type[out->type],(char *)out->value);
+    ecjp_printf("%s - %d: Find key %s of type %s with value: %s\n",__FUNCTION__,__LINE__,in->key,ecjp_type[out->type],(char *)out->value);
 #endif
 
     ret = out->error_code;
@@ -575,11 +569,9 @@ ecjp_value_type_t ecjp_get_key_and_value(const char input[], char *key, ecjp_key
     }
 
     while (current != NULL) {
-#if DEBUG        
         if(current->key.length >= ECJP_MAX_KEY_LEN) {
             ecjp_printf("%s - %d: Key length exceeds maximum buffer size (%d), truncating output.\n",__FUNCTION__,__LINE__,(ECJP_MAX_KEY_LEN - 1));
         }
-#endif
         memset(buffer, 0, sizeof(buffer));
         len = (current->key.length < ECJP_MAX_KEY_LEN) ? current->key.length : (ECJP_MAX_KEY_LEN - 1);
         strncpy(buffer, &input[current->key.start_pos], len);
@@ -590,9 +582,7 @@ ecjp_value_type_t ecjp_get_key_and_value(const char input[], char *key, ecjp_key
             if (current->key.type != ECJP_TYPE_UNDEFINED) {
                 type = current->key.type; // return last found type
                 if(value == NULL || value_size == 0) {
-#if DEBUG
                     ecjp_printf("%s - %d: No buffer supplied for store value\n", __FUNCTION__,__LINE__);
-#endif
                     return type;
                 }
                 else {
