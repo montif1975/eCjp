@@ -17,11 +17,13 @@ extern "C" {
 #include "ecjp_limit.h"
 
 #define DEBUG                       1
-#define DEBUG_VERBOSE
+//#define DEBUG_VERBOSE
 
 #define ECJP_VERSION_MAJOR           0
-#define ECJP_VERSION_MINOR           1
+#define ECJP_VERSION_MINOR           2
 #define ECJP_VERSION_PATCH           0
+
+#define ECJP_ARRAY_NO_INDEX         -1
 
 typedef enum {
     ECJP_BOOL_FALSE,
@@ -55,6 +57,8 @@ typedef enum {
     ECJP_EMPTY_STRING,
     ECJP_NO_MORE_KEY,
     ECJP_NO_SPACE_IN_BUFFER_VALUE,
+    ECJP_INDEX_OUT_OF_BOUNDS,
+    ECJP_INDEX_NOT_FOUND,
     ECJP_MAX_ERROR
 } ecjp_return_code_t;
 
@@ -70,6 +74,21 @@ typedef enum {
     ECJP_PS_END,
     ECJP_PS_MAX_STATUS
 } ecjp_parse_status_t;
+
+typedef enum {
+    ECJP_PA_START = 0,
+    ECJP_PA_IN_ARRAY,
+    ECJP_PA_IN_STRING,
+    ECJP_PA_IN_NUMBER,
+    ECJP_PA_IN_BOOL,
+    ECJP_PA_IN_NULL,
+    ECJP_PA_OBJ_ELEM,
+    ECJP_PA_ARRAY_ELEM,
+    ECJP_PA_WAIT_COMMA,
+    ECJP_PA_ERROR,
+    ECJP_PA_END,
+    ECJP_PA_MAX_STATUS
+} ecjp_parse_array_status_t;
 
 typedef union  {
         unsigned char all;
@@ -154,6 +173,7 @@ ecjp_return_code_t ecjp_free_key_list(ecjp_key_elem_t **key_list);
 ecjp_value_type_t ecjp_get_key(const char input[], char *key, ecjp_key_elem_t **key_list);
 ecjp_return_code_t ecjp_get_keys(const char input[],char *key,ecjp_key_elem_t **key_list,ecjp_outdata_t *out);
 ecjp_return_code_t ecjp_read_key(const char input[],ecjp_indata_t *in,ecjp_outdata_t *out);
+ecjp_return_code_t ecjp_read_array_element(const char input[],int index,ecjp_outdata_t *out);
 ecjp_value_type_t ecjp_get_key_and_value(const char input[], char *key, ecjp_key_elem_t **key_list, void *value, size_t value_size);
 ecjp_return_code_t ecjp_check_and_load(const char *input, ecjp_key_elem_t **key_list, ecjp_check_result_t *res);
 ecjp_return_code_t ecjp_check_syntax(const char *input, ecjp_check_result_t *res);

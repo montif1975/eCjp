@@ -15,6 +15,8 @@ int main(int argc, char *argv[])
     char *ptr;
     struct stat strstat;
     ecjp_key_elem_t *key_list = NULL;
+    ecjp_outdata_t out;
+    int index = 0;
 
     results.err_pos = -1;
     results.num_keys = 0;
@@ -68,11 +70,28 @@ int main(int argc, char *argv[])
                     else {
                         fprintf(stdout, "ecjp_check_syntax() on JSON file: SUCCEEDED.\n");
                         fprintf(stdout, "ecjp_check_syntax() - num. keys found = %d, struct type = %d.\n",results.num_keys,results.struct_type);
-                        if (results.num_keys != 0) {
+                        if ((results.struct_type == ECJP_ST_OBJ) && (results.num_keys != 0)) {
                             if (key_list != NULL) {
                                     ecjp_print_keys(ptr, key_list);
                                     ecjp_free_key_list(&key_list);
                                 }    
+                        } else if (results.struct_type == ECJP_ST_ARRAY) {
+                            out.error_code = ECJP_NO_ERROR;
+                            out.value = (char *)malloc(ECJP_MAX_ARRAY_ELEM_LEN);
+                            out.value_size = ECJP_MAX_ARRAY_ELEM_LEN;
+                            if (out.value == NULL) {
+                                fprintf(stderr, "Memory allocation failed for array element value buffer\n");
+                                return -1;
+                            }
+                            fprintf(stdout, "\nReading array elements:\n");
+                            while (ecjp_read_array_element(ptr,index,&out) == ECJP_NO_ERROR) {
+                                fprintf(stdout, "Array element #%d read successfully.\n",index);
+                                fprintf(stdout, "Type = %d, Value = %s\n", out.type, (char *)out.value);
+                                out.value_size = ECJP_MAX_ARRAY_ELEM_LEN;
+                                index++;
+                            }
+                            free(out.value);
+                            out.value = NULL;
                         }
                     }
                     free(ptr);

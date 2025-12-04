@@ -150,6 +150,32 @@ void ecjp_print_check_summary(ecjp_parser_data_t *p)
 #endif
 
 
+ecjp_return_code_t ecjp_internal_copy_array_element(char *buffer, unsigned int p_buffer, int index, int num_elements, ecjp_outdata_t *out)
+{
+    ecjp_return_code_t ret = ECJP_INDEX_NOT_FOUND;
+
+    // check if this is the requested element
+    if ((index != ECJP_ARRAY_NO_INDEX) && (num_elements - 1 == index)) {
+        // found requested element
+        if (p_buffer >= ECJP_MAX_ARRAY_ELEM_LEN) {
+            ecjp_printf("%s - %d: Value buffer too small, truncated to %d bytes\n", __FUNCTION__,__LINE__,(ECJP_MAX_ARRAY_ELEM_LEN - 1));
+        }
+        // copy to out structure
+        if ((out->value != NULL) && (out->value_size > 0)) {
+            strncpy(out->value, buffer, (p_buffer < out->value_size) ? p_buffer : (out->value_size - 1));
+            *(char *)(out->value + ((p_buffer < out->value_size) ? p_buffer : (out->value_size - 1))) = '\0'; // null terminate
+            out->length = (p_buffer < out->value_size) ? p_buffer : (out->value_size - 1);
+            out->error_code = ECJP_NO_ERROR;
+            ret = out->error_code;
+        } else {
+            out->error_code = ECJP_NO_SPACE_IN_BUFFER_VALUE;
+            ret = out->error_code;
+        }
+    }
+    return ret;
+}
+
+
 // External function definitions
 ecjp_return_code_t ecjp_dummy(void)
 {
@@ -552,6 +578,683 @@ ecjp_return_code_t ecjp_read_key(const char input[],ecjp_indata_t *in,ecjp_outda
     return ret;
 }
 
+ecjp_return_code_t ecjp_read_array_element(const char input[],int index,ecjp_outdata_t *out)
+{
+    ecjp_return_code_t ret = ECJP_NO_ERROR;
+    ecjp_parser_data_t *p;
+    ecjp_parser_data_t parser_data;
+    char buffer[ECJP_MAX_ARRAY_ELEM_LEN];
+    int p_buffer = 0;
+    int num_elements = 0;
+
+    memset(&parser_data, 0, sizeof(ecjp_parser_data_t));
+    p =  &parser_data;
+    p->parse_stack.top = -1;
+    
+    if (out == NULL) {
+        ecjp_printf("%s - %d: NULL pointer out",__FUNCTION__,__LINE__);
+        ret = ECJP_NULL_POINTER;
+        return ret;
+    }
+    if (index == ECJP_ARRAY_NO_INDEX) {
+        ecjp_printf("%s - %d: No index specified",__FUNCTION__,__LINE__);
+        ret = ECJP_EMPTY_STRING;
+        return ret;
+    }
+
+    memset(buffer, 0, sizeof(buffer));
+
+    p->index = 0;
+    p->flags.all = 0;
+    p->status = ECJP_PS_START;
+    while ((input[p->index] != '\0') && (p->status != ECJP_PA_END) && (p->status != ECJP_PA_ERROR)) {
+        // walk through the string
+#ifdef DEBUG_VERBOSE        
+        ecjp_printf("%s - %d: Index %d, Status %d, Char '%c'\n", __FUNCTION__,__LINE__, p->index, p->status, input[p->index]);
+#endif
+        switch (p->status)
+        {
+            case ECJP_PA_START:
+                switch (input[p->index]) {
+                    case ' ':
+                    case '\n':
+                    case '\r':
+                    case '\t':
+                        // skip whitespace
+                        break;
+                        
+                    case '{':
+                        ecjp_printf("%s - %d: Input must cannot start with '{' in an array\n", __FUNCTION__,__LINE__);
+                        p->status = ECJP_PA_ERROR;
+                        break;
+
+                    case '[':
+                        p->open_square_brackets++;
+                        p->num_arrays++;
+                        if(ecjp_push_parse_stack(&(p->parse_stack), '[') == ECJP_BOOL_FALSE) {
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }   
+                        p->status = ECJP_PA_IN_ARRAY;
+                        break;
+
+                    default:
+                        ecjp_printf("%s - %d: Input must start with '['\n", __FUNCTION__,__LINE__);
+                        p->status = ECJP_PA_ERROR;
+                        break;
+                }
+                break;
+
+            case ECJP_PA_IN_ARRAY:
+                switch (input[p->index]) {
+                    case ' ':
+                    case '\n':
+                    case '\r':
+                    case '\t':
+                        // skip whitespace
+                        break;
+
+                    case ']':
+                        p->open_square_brackets--;
+                        if (p->open_square_brackets < 0) {
+                            ecjp_printf("%s - %d: Mismatched closing square bracket\n", __FUNCTION__,__LINE__);
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        if (p->flags.trailing_comma) {
+                            ecjp_printf("%s - %d: Trailing comma before closing square bracket\n", __FUNCTION__,__LINE__);
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        if (ecjp_pop_parse_stack(&(p->parse_stack), '[') == ECJP_BOOL_FALSE) {
+                            ecjp_printf("%s - %d: Unexpected closing square bracket\n", __FUNCTION__,__LINE__);
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        if (p->open_brackets == 0 && p->open_square_brackets == 0) {
+                            p->status = ECJP_PA_END;
+                        } else {
+                            p->status = ECJP_PA_WAIT_COMMA;
+                        }
+                        break;
+
+                    case '}':
+                        p->open_brackets--;
+                        if (p->open_brackets < 0) {
+                            ecjp_printf("%s - %d: Mismatched closing bracket\n", __FUNCTION__,__LINE__);
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        if (p->flags.trailing_comma) {
+                            ecjp_printf("%s - %d: Trailing comma before closing bracket\n", __FUNCTION__,__LINE__);
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        if (ecjp_pop_parse_stack(&(p->parse_stack), '{') == ECJP_BOOL_FALSE) {
+                            ecjp_printf("%s - %d: Unexpected closing bracket\n", __FUNCTION__,__LINE__);
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        if (p->open_brackets == 0 && p->open_square_brackets == 0) {
+                            p->status = ECJP_PA_END;
+                        } else {
+                            p->status = ECJP_PA_WAIT_COMMA;
+                        }
+                        break;
+
+                    case '[':
+                        p->open_square_brackets++;
+                        p->num_arrays++;
+                        if(ecjp_push_parse_stack(&(p->parse_stack), '[') == ECJP_BOOL_FALSE) {
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        // copy character in buffer
+                        buffer[p_buffer] = input[p->index];
+                        p_buffer++;
+                        p->status = ECJP_PA_ARRAY_ELEM;
+                        out->type = ECJP_TYPE_ARRAY;
+                        if(p->flags.trailing_comma) {
+                            p->flags.trailing_comma = 0;
+                        }
+                        break;
+
+                    case '{':
+                        p->open_brackets++;
+                        p->num_objects++;
+                        if(ecjp_push_parse_stack(&(p->parse_stack), '{') == ECJP_BOOL_FALSE) {
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        // copy character in buffer
+                        buffer[p_buffer] = input[p->index];
+                        p_buffer++;
+                        p->status = ECJP_PA_OBJ_ELEM;
+                        out->type = ECJP_TYPE_OBJECT;
+                        if(p->flags.trailing_comma) {
+                            p->flags.trailing_comma = 0;
+                        }
+                        break;
+                    
+                    case '"':
+                        // copy character in buffer
+                        buffer[p_buffer] = input[p->index];
+                        p_buffer++;
+                        p->status = ECJP_PA_IN_STRING;
+                        out->type = ECJP_TYPE_STRING;
+                        if(p->flags.trailing_comma) {
+                            p->flags.trailing_comma = 0;
+                        }
+                        break;
+
+                    case '0':
+                    case '1':
+                    case '2':
+                    case '3':
+                    case '4':
+                    case '5':
+                    case '6':
+                    case '7':
+                    case '8':
+                    case '9':
+                    case '-':
+                        // copy character in buffer
+                        buffer[p_buffer] = input[p->index];
+                        p_buffer++;
+                        p->status = ECJP_PA_IN_NUMBER;
+                        out->type = ECJP_TYPE_NUMBER;
+                        if(p->flags.trailing_comma) {
+                            p->flags.trailing_comma = 0;
+                        }
+                        break;
+
+                    case 't':
+                    case 'f':
+                        // copy character in buffer
+                        buffer[p_buffer] = input[p->index];
+                        p_buffer++;
+                        p->status = ECJP_PA_IN_BOOL;
+                        out->type = ECJP_TYPE_BOOL;
+                        if(p->flags.trailing_comma) {
+                            p->flags.trailing_comma = 0;
+                        }
+                        break;
+
+                    case 'n':
+                        // copy character in buffer
+                        buffer[p_buffer] = input[p->index];
+                        p_buffer++;
+                        p->status = ECJP_PA_IN_NULL;
+                        out->type = ECJP_TYPE_NULL;
+                        if(p->flags.trailing_comma) {
+                            p->flags.trailing_comma = 0;
+                        }
+                        break;
+
+                    default:
+                        ecjp_printf("%s - %d: Character %c unexpected\n", __FUNCTION__,__LINE__,input[p->index]);
+                        p->status = ECJP_PA_ERROR;
+                        break;
+                }
+                break;
+
+            case ECJP_PA_IN_STRING:
+                switch(input[p->index]) {
+                    case '"':
+                        // copy closing quote
+                        buffer[p_buffer] = input[p->index];
+                        p_buffer++;
+                        p->status = ECJP_PA_WAIT_COMMA;
+                        break;
+
+                    default:
+                        // copy character in buffer
+                        buffer[p_buffer] = input[p->index];
+                        p_buffer++;
+                        break;
+                }
+                break;
+
+            case ECJP_PA_IN_NUMBER:
+                switch(input[p->index]) {
+                    case '0':
+                    case '1':
+                    case '2':
+                    case '3':
+                    case '4':
+                    case '5':
+                    case '6':
+                    case '7':
+                    case '8':
+                    case '9':
+                    case '-':
+                    case '+':
+                    case '.':
+                    case 'e':
+                    case 'E':
+                        // copy character in buffer
+                        buffer[p_buffer] = input[p->index];
+                        p_buffer++;
+                        break;
+
+                    case ',':
+                        if (p->flags.trailing_comma) {
+                            ecjp_printf("%s - %d: Multiple trailing commas\n", __FUNCTION__,__LINE__);
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        p->flags.trailing_comma = 1;
+                        p->status = ECJP_PA_IN_ARRAY;
+                        // check if this is the requested element
+                        num_elements++;
+                        ret = ecjp_internal_copy_array_element(buffer, p_buffer, index, num_elements, out);
+                        if (ret != ECJP_INDEX_NOT_FOUND) {
+                            // found requested element, can exit
+                            return ret;
+                        }
+                        // reset buffer for next element
+                        memset(buffer, 0, sizeof(buffer));
+                        p_buffer = 0;
+                        break;
+
+                    case ' ':
+                    case '\n':
+                    case '\r':
+                    case '\t':
+                        // whitespace breaks number
+                        p->status = ECJP_PA_WAIT_COMMA;
+                        continue;
+
+                    default:
+                        ecjp_printf("%s - %d: Character %c unexpected\n", __FUNCTION__,__LINE__,input[p->index]);
+                        p->status = ECJP_PA_ERROR;
+                        break;
+                }
+                break;
+
+            case ECJP_PA_IN_BOOL:
+                if (buffer[p_buffer - 1] == 't') {
+                    // already have first character
+                    if (strncmp(&input[p->index], "rue", 3) == 0) {
+                        // copy the remaing characters of "true"
+                        buffer[p_buffer++] = 'r';
+                        buffer[p_buffer++] = 'u';
+                        buffer[p_buffer++] = 'e';
+                        p->index += 3;
+                        p->status = ECJP_PA_WAIT_COMMA;
+                        continue;
+                    } else {
+                        ecjp_printf("%s - %d: Character %c unexpected\n", __FUNCTION__,__LINE__,input[p->index]);
+                        p->status = ECJP_PA_ERROR;
+                    }                
+                } else if (buffer[p_buffer - 1] == 'f') {
+                    // already have first character
+                    if (strncmp(&input[p->index], "alse", 4) == 0) {
+                        // copy the remaining characters of "false"
+                        buffer[p_buffer++] = 'a';
+                        buffer[p_buffer++] = 'l';
+                        buffer[p_buffer++] = 's';
+                        buffer[p_buffer++] = 'e';
+                        p->index += 4;
+                        p->status = ECJP_PA_WAIT_COMMA;
+                        continue;
+                    } else {
+                        ecjp_printf("%s - %d: Character %c unexpected\n", __FUNCTION__,__LINE__,input[p->index]);
+                        p->status = ECJP_PA_ERROR;
+                    }
+                } else {
+                    ecjp_printf("%s - %d: Character %c unexpected\n", __FUNCTION__,__LINE__,input[p->index]);
+                    p->status = ECJP_PA_ERROR;
+                }   
+                break;
+
+            case ECJP_PA_IN_NULL:
+                if (buffer[p_buffer - 1] == 'n' || buffer[p_buffer - 1] == 'N') {
+                    // already have first character
+                    if (strncmp(&input[p->index], "ull", 3) == 0) {
+                        // copy the remaing characters of "null"
+                        buffer[p_buffer++] = 'u';
+                        buffer[p_buffer++] = 'l';
+                        buffer[p_buffer++] = 'l';
+                        p->index += 3;
+                        p->status = ECJP_PA_WAIT_COMMA;
+                        continue;
+                    } else {
+                        ecjp_printf("%s - %d: Character %c unexpected\n", __FUNCTION__,__LINE__,input[p->index]);
+                        p->status = ECJP_PA_ERROR;
+                    }                
+                } else {
+                    ecjp_printf("%s - %d: Character %c unexpected\n", __FUNCTION__,__LINE__,input[p->index]);
+                    p->status = ECJP_PA_ERROR;
+                }
+                break;
+
+            case ECJP_PA_OBJ_ELEM:
+                switch(input[p->index]) {
+                    case '}':
+                        p->open_brackets--;
+                        if (p->open_brackets < 0) {
+                            ecjp_printf("%s - %d: Mismatched closing bracket\n", __FUNCTION__,__LINE__);
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        if (p->flags.trailing_comma) {
+                            ecjp_printf("%s - %d: Trailing comma before closing bracket\n", __FUNCTION__,__LINE__);
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        if (ecjp_pop_parse_stack(&(p->parse_stack), '{') == ECJP_BOOL_FALSE) {
+                            ecjp_printf("%s - %d: Unexpected closing bracket\n", __FUNCTION__,__LINE__);
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        if (p->open_brackets == 0 && p->open_square_brackets == 0) {
+                            p->status = ECJP_PA_END;
+                        } else {
+                            // copy character in buffer
+                            buffer[p_buffer] = input[p->index];
+                            p_buffer++;
+                            // check if this bracket closes the current object
+                            if (p->open_square_brackets == 1) {
+                                p->status = ECJP_PA_WAIT_COMMA;
+                            }
+                        }
+                        break;
+
+                    case '{':
+                        p->open_brackets++;
+                        p->num_objects++;
+                        if(ecjp_push_parse_stack(&(p->parse_stack), '{') == ECJP_BOOL_FALSE) {
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }   
+                        // copy character in buffer
+                        buffer[p_buffer] = input[p->index];
+                        p_buffer++;
+                        break;
+
+                    case '[':
+                        p->open_square_brackets++;
+                        p->num_arrays++;
+                        if(ecjp_push_parse_stack(&(p->parse_stack), '[') == ECJP_BOOL_FALSE) {
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }   
+                        // copy character in buffer
+                        buffer[p_buffer] = input[p->index];
+                        p_buffer++;
+                        break;
+
+                    case ']':
+                        p->open_square_brackets--;
+                        if (p->open_square_brackets < 0) {
+                            ecjp_printf("%s - %d: Mismatched closing square bracket\n", __FUNCTION__,__LINE__);
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        if (p->flags.trailing_comma) {
+                            ecjp_printf("%s - %d: Trailing comma before closing square bracket\n", __FUNCTION__,__LINE__);
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        if (ecjp_pop_parse_stack(&(p->parse_stack), '[') == ECJP_BOOL_FALSE) {
+                            ecjp_printf("%s - %d: Unexpected closing square bracket\n", __FUNCTION__,__LINE__);
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        if (p->open_brackets == 0 && p->open_square_brackets == 0) {
+                            p->status = ECJP_PA_END;
+                        } else {
+                            // copy character in buffer
+                            buffer[p_buffer] = input[p->index];
+                            p_buffer++;
+                        }
+                        break;
+
+                    default:
+                        // copy character in buffer
+                        buffer[p_buffer] = input[p->index];
+                        p_buffer++;
+                        break;
+                }
+                break;
+
+            case ECJP_PA_ARRAY_ELEM:
+                switch (input[p->index]) {
+                    case ']':
+                        p->open_square_brackets--;
+                        if (p->open_square_brackets < 0) {
+                            ecjp_printf("%s - %d: Mismatched closing square bracket\n", __FUNCTION__,__LINE__);
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        if (p->flags.trailing_comma) {
+                            ecjp_printf("%s - %d: Trailing comma before closing square bracket\n", __FUNCTION__,__LINE__);
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        if (ecjp_pop_parse_stack(&(p->parse_stack), '[') == ECJP_BOOL_FALSE) {
+                            ecjp_printf("%s - %d: Unexpected closing square bracket\n", __FUNCTION__,__LINE__);
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        if (p->open_brackets == 0 && p->open_square_brackets == 0) {
+                            p->status = ECJP_PA_END;
+                        } else {
+                            // copy character in buffer
+                            buffer[p_buffer] = input[p->index];
+                            p_buffer++;
+                            // check if this bracket closes the current array
+                            if (p->open_square_brackets == 1) {
+                                p->status = ECJP_PA_WAIT_COMMA;
+                            }
+                        }
+                        break;
+
+                    case '{':
+                        p->open_brackets++;
+                        p->num_objects++;
+                        if(ecjp_push_parse_stack(&(p->parse_stack), '{') == ECJP_BOOL_FALSE) {
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }   
+                        // copy character in buffer
+                        buffer[p_buffer] = input[p->index];
+                        p_buffer++;
+                        break;
+
+                    case '[':
+                        p->open_square_brackets++;
+                        p->num_arrays++;
+                        if(ecjp_push_parse_stack(&(p->parse_stack), '[') == ECJP_BOOL_FALSE) {
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }   
+                        // copy character in buffer
+                        buffer[p_buffer] = input[p->index];
+                        p_buffer++;
+                        break;
+
+                    case '}':
+                        p->open_brackets--;
+                        if (p->open_brackets < 0) {
+                            ecjp_printf("%s - %d: Mismatched closing bracket\n", __FUNCTION__,__LINE__);
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        if (p->flags.trailing_comma) {
+                            ecjp_printf("%s - %d: Trailing comma before closing bracket\n", __FUNCTION__,__LINE__);
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        if (ecjp_pop_parse_stack(&(p->parse_stack), '{') == ECJP_BOOL_FALSE) {
+                            ecjp_printf("%s - %d: Unexpected closing bracket\n", __FUNCTION__,__LINE__);
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        if (p->open_brackets == 0 && p->open_square_brackets == 0) {
+                            p->status = ECJP_PA_END;
+                        } else {
+                            // copy character in buffer
+                            buffer[p_buffer] = input[p->index];
+                            p_buffer++;
+                        }
+                        break;
+
+                    default:
+                        // copy character in buffer
+                        buffer[p_buffer] = input[p->index];
+                        p_buffer++;
+                        break;
+                }
+                break;
+
+            case ECJP_PA_WAIT_COMMA:
+                switch(input[p->index]) {
+                    case ' ':
+                    case '\n':
+                    case '\r':
+                    case '\t':
+                        // skip whitespace
+                        break;
+                        
+                    case ',':
+                        if (p->flags.trailing_comma) {
+                            ecjp_printf("%s - %d: Multiple trailing commas\n", __FUNCTION__,__LINE__);
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        p->flags.trailing_comma = 1;
+                        p->status = ECJP_PA_IN_ARRAY;
+                        // check if this is the requested element
+                        num_elements++;
+                        ret = ecjp_internal_copy_array_element(buffer, p_buffer, index, num_elements, out);
+                        if (ret != ECJP_INDEX_NOT_FOUND) {
+                            return ret;
+                        }
+                        // reset buffer for next element
+                        memset(buffer, 0, sizeof(buffer));
+                        p_buffer = 0;
+                        break;
+
+                    case '[':
+                    case '{':
+                        ecjp_printf("%s - %d: Character %c unexpected\n", __FUNCTION__,__LINE__,input[p->index]);
+                        p->status = ECJP_PA_ERROR;
+                        break;
+
+                    case ']':
+                        p->open_square_brackets--;
+                        if (p->open_square_brackets < 0) {
+                            ecjp_printf("%s - %d: Mismatched closing square bracket\n", __FUNCTION__,__LINE__);
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        if (p->flags.trailing_comma) {
+                            ecjp_printf("%s - %d: Trailing comma before closing square bracket\n", __FUNCTION__,__LINE__);
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        if (ecjp_pop_parse_stack(&(p->parse_stack), '[') == ECJP_BOOL_FALSE) {
+                            ecjp_printf("%s - %d: Unexpected closing square bracket\n", __FUNCTION__,__LINE__);
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        if (p->open_brackets == 0 && p->open_square_brackets == 0) {
+                            p->status = ECJP_PA_END;
+                        } else {
+                            p->status = ECJP_PA_IN_ARRAY;
+                        }   
+                        break;
+
+                    case '}':
+                        p->open_brackets--;
+                        if (p->open_brackets < 0) {
+                            ecjp_printf("%s - %d: Mismatched closing bracket\n", __FUNCTION__,__LINE__);
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        if (p->flags.trailing_comma) {
+                            ecjp_printf("%s - %d: Trailing comma before closing bracket\n", __FUNCTION__,__LINE__);
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        if (ecjp_pop_parse_stack(&(p->parse_stack), '{') == ECJP_BOOL_FALSE) {
+                            ecjp_printf("%s - %d: Unexpected closing bracket\n", __FUNCTION__,__LINE__);
+                            p->status = ECJP_PA_ERROR;
+                            break;
+                        }
+                        if (p->open_brackets == 0 && p->open_square_brackets == 0) {
+                            p->status = ECJP_PA_END;
+                        } else {
+                            p->status = ECJP_PA_IN_ARRAY;
+                        }
+                        if (p->open_brackets == 0 && p->open_square_brackets == 0) {
+                            p->status = ECJP_PA_END;
+                        } else {
+                            p->status = ECJP_PA_IN_ARRAY;
+                        }
+                        break;
+
+                    default:
+                        ecjp_printf("%s - %d: Character %c unexpected\n", __FUNCTION__,__LINE__,input[p->index]);
+                        p->status = ECJP_PA_ERROR;
+                        break;
+                }
+                break;
+
+            case ECJP_PA_ERROR:
+                ecjp_printf("%s - %d: Fail to parse the array\n", __FUNCTION__,__LINE__);
+                ret = ECJP_SYNTAX_ERROR;
+                return ret;
+                break;
+
+            case ECJP_PA_END:
+                // reached end of parsing
+                ecjp_printf("%s - %d: End of array parsing\n", __FUNCTION__,__LINE__);
+                // copy the last element if needed
+                // check if this is the requested element
+                num_elements++;
+                ret = ecjp_internal_copy_array_element(buffer, p_buffer, index, num_elements, out);
+                if (ret != ECJP_INDEX_NOT_FOUND) {
+                    return ret;
+                }
+                // reset buffer for next element
+                memset(buffer, 0, sizeof(buffer));
+                p_buffer = 0;
+                break;
+
+            default:
+                break;
+        }
+        p->index++;
+    }
+
+    // check if we reach the end of parsing without manage the last state
+    if (p->status == ECJP_PA_END && p_buffer != 0) {
+        ecjp_printf("%s - %d: End of array parsing\n", __FUNCTION__,__LINE__);
+        // copy the last element if needed
+        // check if this is the requested element
+        num_elements++;
+        ret = ecjp_internal_copy_array_element(buffer, p_buffer, index, num_elements, out);
+    } else {
+        if (p->status != ECJP_PS_END) {
+            ecjp_printf("%s - %d: Incomplete JSON structure\n", __FUNCTION__,__LINE__);
+            return ECJP_SYNTAX_ERROR;
+        }
+        if ((p->open_brackets != 0) || (p->open_square_brackets != 0)) {
+            ecjp_printf("%s - %d: Mismatched brackets at end of input\n", __FUNCTION__,__LINE__);
+            return ECJP_BRACKETS_MISSING;
+        }
+    }
+    
+    if (index > (num_elements - 1)) {
+        ecjp_printf("%s - %d: Requested index %d exceeds number of elements %d\n", __FUNCTION__,__LINE__,index,(num_elements-1));
+        return ECJP_INDEX_OUT_OF_BOUNDS;
+    }  
+
+    return ret;
+}
 
 ecjp_value_type_t ecjp_get_key_and_value(const char input[], char *key, ecjp_key_elem_t **key_list, void *value, size_t value_size)
 {
