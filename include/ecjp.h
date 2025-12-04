@@ -152,6 +152,7 @@ typedef struct ecjp_indata {
     ECJP_TYPE_LEN_KEY   lenght;
 } ecjp_indata_t;
 
+#if 0
 // function prototypes for internal use
 ecjp_bool_t ecjp_is_whitespace(char c);
 ecjp_bool_t ecjp_is_excode(char c);
@@ -161,6 +162,8 @@ ecjp_bool_t ecjp_peek_parse_stack(ecjp_parse_stack_item_t *stack, char check_val
 int ecjp_add_node_end(ecjp_key_elem_t **key_list, ecjp_key_token_t *new_key);
 #if DEBUG
 void ecjp_print_check_summary(ecjp_parser_data_t *p);
+#endif
+ecjp_return_code_t ecjp_internal_copy_array_element(char *buffer, unsigned int p_buffer, int index, int num_elements, ecjp_outdata_t *out);
 #endif
 
 // Function declarations (public API)
