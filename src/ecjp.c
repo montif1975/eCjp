@@ -1,4 +1,4 @@
-#include "include/ecjp.h"
+#include "ecjp.h"
 
 #if DEBUG
 #define ecjp_printf(format, ...)    printf(format, __VA_ARGS__)

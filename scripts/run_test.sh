@@ -3,7 +3,7 @@
 PROG="example_ecjp"
 BASE_DIR=".."
 #echo Work dir = $BASE_DIR
-BUILD_DIR="${BASE_DIR}/build"
+BUILD_DIR="${BASE_DIR}/build/src"
 TESTS_DIR="${BASE_DIR}/tests"
 LD_LIBRARY_PATH=$BUILD_DIR
 

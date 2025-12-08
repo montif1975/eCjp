@@ -1,4 +1,5 @@
-#include "include/ecjp.h"
+//#include "include/ecjp.h"
+#include "ecjp.h"
 
 #include "sys/stat.h"
 #include <unistd.h>

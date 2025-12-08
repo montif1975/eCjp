@@ -63,3 +63,43 @@ Release/
 x64/
 x86/
 
+# Autotools generated files
+/aclocal.m4
+/autom4te.cache/
+/compile
+/config.guess
+/config.log
+/config.status
+/config.sub
+/configure
+/depcomp
+/install-sh
+/missing
+/ltmain.sh
+/stamp-h1
+
+# Autoconf/Automake output
+Makefile.in
+*/Makefile.in
+config.h
+config.h.in
+
+# Build directories
+/build/
+/.libs/
+/.deps/
+
+# Objects and libtool objects
+*.o
+*.lo
+*.la
+*.a
+*.so
+*.dll
+ar-lib
+
+# Editor/temporary files
+*~
+*.swp
+*.bak
+

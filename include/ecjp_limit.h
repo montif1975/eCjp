@@ -1,6 +1,8 @@
 #ifndef ECJP_LIMIT_H
 #define ECJP_LIMIT_H
 
+#include "config.h"
+
 #ifdef ECJP_RUN_ON_PC
 #define ECJP_MAX_INPUT_SIZE          1024*1024 // 1 MB
 #define ECJP_MAX_PRINT_COLUMNS       80
