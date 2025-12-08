@@ -42,6 +42,10 @@ if test "x$run_on_pc_flag" = "xyes"; then
     AC_DEFINE([ECJP_RUN_ON_PC], [1], [Enable ECJP_RUN_ON_PC])
 fi
 
+if test "x$run_on_mcu_flag" = "xyes"; then
+    AC_DEFINE([ECJP_RUN_ON_MCU], [1], [Enable ECJP_RUN_ON_MCU])
+fi
+
 # ---- Makefile ----
 AC_CONFIG_FILES([
     Makefile
