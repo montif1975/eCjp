@@ -204,42 +204,27 @@ void usage(char *prog_name)
 int main(int argc, char *argv[])
 {
     int major, minor, patch;
-    char version_string[16];
+    int array_index;
     ecjp_return_code_t ret;
     ecjp_check_result_t results;
     char *ptr;
     struct stat strstat;
+    unsigned char level;
+    ecjp_outdata_t out;
     ecjp_key_elem_t *key_list = NULL;
 
-//    int err_pos = -1;
+    int err_pos = -1;
     results.err_pos = -1;
     results.num_keys = 0;
     results.struct_type = ECJP_ST_NULL;
     
-    ret = ecjp_dummy();
-    if (ret != ECJP_NO_ERROR) {
-        fprintf(stderr, "ecjp_dummy() failed with error code: %d\n", ret);
-    }
-    else {
-        fprintf(stdout, "ecjp_dummy() succeeded.\n");
-    }
-
     major = minor = patch = 0;
     ret = ecjp_get_version(&major, &minor, &patch);
     if (ret != ECJP_NO_ERROR) {
         fprintf(stderr, "ecjp_get_version() failed with error code: %d\n", ret);
     }
     else {
-        fprintf(stdout, "ecjp_get_version() succeeded. Version: %d.%d.%d\n", major, minor, patch);
-    }
-
-    memset(version_string, 0, sizeof(version_string));
-    ret = ecjp_get_version_string(version_string, sizeof(version_string));
-    if (ret != ECJP_NO_ERROR) {
-        fprintf(stderr, "ecjp_get_version_string() failed with error code: %d\n", ret);
-    }
-    else {
-        fprintf(stdout, "ecjp_get_version_string() succeeded. Version string: %s\n", version_string);
+        fprintf(stdout, "\nUsing eCjp version: %d.%d.%d\n", major, minor, patch);
     }
 
     // check arguments and open test files
@@ -248,7 +233,7 @@ int main(int argc, char *argv[])
         return -1;
     }
     if(argc == 2) {
-        fprintf(stdout, "\nTesting input file: %s\n", argv[1]);
+        fprintf(stdout, "\nUsing input file: %s\n", argv[1]);
         memset(&strstat, 0, sizeof(struct stat));
         ret = stat(argv[1], &strstat);
         if (ret == 0)
@@ -261,12 +246,8 @@ int main(int argc, char *argv[])
                     size_t read_bytes = fread(ptr, 1, file_size, f);
                     ptr[read_bytes] = '\0';
                     fclose(f);
-                    fprintf(stdout, "\nTesting JSON file (%s) of size %ld bytes:\n", argv[1], file_size);
-#if 1                    
-                    ret = ecjp_check_and_load(ptr,&key_list,&results,3);
-#else
+                    fprintf(stdout, "\nUsing JSON file (%s) of size %ld bytes:\n", argv[1], file_size);
                     ret = ecjp_check_syntax(ptr,&results);
-#endif
                     if (ret != ECJP_NO_ERROR) {
                         fprintf(stderr, "ecjp_check_syntax() on JSON file: FAILED with error code: %d\n", ret);
                         if (results.err_pos >= 0) {
@@ -290,21 +271,44 @@ int main(int argc, char *argv[])
                         return -1;
                     }
                     else {
+                        level = 1;
                         fprintf(stdout, "ecjp_check_syntax() on JSON file: SUCCEEDED.\n");
-                        fprintf(stdout, "ecjp_check_syntax() - num. keys found = %d, struct type = %d.\n",results.num_keys,results.struct_type);
-                        if (results.num_keys != 0) {
-                            if (key_list != NULL) {
-                                    ecjp_print_keys(ptr, key_list);
-#ifdef TEST_KEY_FIND
-                                    // Test key finding
-//                                  print_all_key_and_value(ptr, key_list);
-                                    print_keys_and_value(ptr,key_list);
-//                                  print_all_keys(ptr,key_list);
-//                                  print_all_specific_key(ptr,key_list);
-#endif
-                                    print_and_free_key_list(&key_list);
-                                }    
+                        if (results.struct_type == ECJP_ST_OBJ) {
+                            fprintf(stdout, "Level %d structure is an OBJECT.\n", level);
+                            ret = ecjp_load(ptr,&key_list,&results,level);
+                            if (ret != ECJP_NO_ERROR) {
+                                fprintf(stderr, "ecjp_load() on JSON file: FAILED with error code: %d\n", ret);
+                                free(ptr);
+                                ptr = NULL;
+                                return -1;
+                            } else {
+                                if (key_list != NULL && results.num_keys != 0) {
+                                    ecjp_get_keys_and_value(ptr, key_list);
+                                }
+                            }
+                        } else if (results.struct_type == ECJP_ST_ARRAY) {
+                            fprintf(stdout, "Level %d structure is an ARRAY.\n", level);
+                            array_index = 0;
+                            out.error_code = ECJP_NO_ERROR;
+                            out.value = (char *)malloc(ECJP_MAX_ARRAY_ELEM_LEN);
+                            out.value_size = ECJP_MAX_ARRAY_ELEM_LEN;
+                            if (out.value == NULL) {
+                                fprintf(stderr, "Memory allocation failed for array element value buffer\n");
+                                return -1;
+                            }
+                            fprintf(stdout, "\nReading array elements:\n");
+                            while (ecjp_read_array_element(ptr,array_index,&out) == ECJP_NO_ERROR) {
+                                fprintf(stdout, "Array element #%d read successfully.\n",array_index);
+                                fprintf(stdout, "Type = %d, Value = %s\n", out.type, (char *)out.value);
+                                out.value_size = ECJP_MAX_ARRAY_ELEM_LEN;
+                                array_index++;
+                            }
+                            free(out.value);
+                            out.value = NULL;
+                        } else {
+                            fprintf(stdout, "Top-level structure is NULL or UNDEFINED.\n");
                         }
+//                        fprintf(stdout, "ecjp_check_syntax() - num. keys found = %d, struct type = %d.\n",results.num_keys,results.struct_type);
                     }
                     free(ptr);
                     ptr = NULL;

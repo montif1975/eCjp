@@ -437,7 +437,7 @@ ecjp_return_code_t ecjp_read_key(const char input[],ecjp_indata_t *in,ecjp_outda
     open_brackets = 0;
     
     // set to input buffer start position
-    ptr = (char *)&input[in->pos + in->lenght + 1]; // skip key and quote
+    ptr = (char *)&input[in->pos + in->length + 1]; // skip key and quote
     // find colon
     while (*ptr != ':' && *ptr != '\0') {
         ptr++;
@@ -567,13 +567,107 @@ ecjp_return_code_t ecjp_read_key(const char input[],ecjp_indata_t *in,ecjp_outda
         memcpy(out->value, ptr_value, vsize);
 
     out->last_pos = in->pos;
-    out->length = in->lenght;
+    out->length = in->length;
 
 #ifdef DEBUG_VERBOSE
     ecjp_printf("%s - %d: Find key %s of type %s with value: %s\n",__FUNCTION__,__LINE__,in->key,ecjp_type[out->type],(char *)out->value);
 #endif
 
     ret = out->error_code;
+
+    return ret;
+}
+
+// TODO in progress function to get all keys and their values
+ecjp_return_code_t ecjp_get_keys_and_value(char *ptr,ecjp_key_elem_t *key_list)
+{
+    ecjp_outdata_t out_get;
+    ecjp_outdata_t out_read, out_array;
+    ecjp_indata_t in;
+    ecjp_return_code_t ret;
+
+    memset(&out_get,0,sizeof(out_get));
+    out_get.value = malloc(ECJP_MAX_KEY_LEN);
+    out_get.value_size = ECJP_MAX_KEY_LEN;
+    memset(out_get.value,0,out_get.value_size);
+
+    memset(&out_read,0,sizeof(out_read));
+    out_read.value = malloc(ECJP_MAX_KEY_LEN);
+    out_read.value_size = ECJP_MAX_KEY_LEN;
+    memset(out_read.value,0,out_read.value_size);
+
+    memset(&out_array,0,sizeof(out_array));
+    out_array.value = malloc(ECJP_MAX_KEY_LEN);
+    out_array.value_size = ECJP_MAX_KEY_LEN;
+    memset(out_array.value,0,out_array.value_size);
+
+    memset(&in,0,sizeof(in));
+
+    ret = ECJP_NO_ERROR;
+
+    do {
+        ret = ecjp_get_keys(ptr,NULL,&key_list,&out_get);
+        if (ret != ECJP_NO_MORE_KEY) {
+#if 0            
+            fprintf(stdout,
+                    "Find key: %s [error_code=%d type=%d last_pos=%d]\n",
+                    (char *)out_get.value,
+                    out_get.error_code,
+                    out_get.type,
+                    out_get.last_pos);
+#endif
+            // read value for this key
+            in.length = out_get.length;
+            in.type = out_get.type;
+            in.pos = out_get.last_pos;
+            strncpy(in.key,out_get.value,out_get.value_size);
+            fprintf(stdout,
+                    "Key %s lenght: %d type: %d pos: %d ",
+                    in.key,
+                    in.length,
+                    in.type,
+                    in.pos);
+            if(ecjp_read_key(ptr,&in,&out_read) == ECJP_NO_ERROR) {
+                fprintf(stdout,
+                        "value = %s\n",
+                        (char *)out_read.value);
+                if (in.type == ECJP_TYPE_ARRAY) {
+                    int index = 0;
+                    while (ecjp_read_array_element(out_read.value,index,&out_array) == ECJP_NO_ERROR) {
+                        fprintf(stdout, "Array element #%d read successfully.\n",index);
+                        fprintf(stdout, "Type = %d, Value = %s\n", out_array.type, (char *)out_array.value);
+                        // reset out_read
+                        out_array.error_code = ECJP_NO_ERROR;
+                        out_array.last_pos = 0;
+                        out_array.length = 0;
+                        out_array.type = ECJP_TYPE_UNDEFINED;
+                        memset(out_array.value,0,out_array.value_size);
+                        index++;
+                    }
+                }
+            } else {
+                fprintf(stdout,
+                        "Error reading key %s. Error code = %d\n",
+                        in.key,
+                        out_read.error_code);
+            }
+            // reset out_get but not the last position
+            out_get.error_code = ECJP_NO_ERROR;
+            out_get.type = ECJP_TYPE_UNDEFINED;
+            memset(out_get.value,0,out_get.value_size);
+            // reset out_read
+            out_read.error_code = ECJP_NO_ERROR;
+            out_read.last_pos = 0;
+            out_read.length = 0;
+            out_read.type = ECJP_TYPE_UNDEFINED;
+            memset(out_read.value,0,out_read.value_size);
+            // reset in
+            memset(&in,0,sizeof(in));   
+        }        
+    } while(ret != ECJP_NO_MORE_KEY);
+    
+    free(out_get.value);
+    free(out_read.value);
 
     return ret;
 }
@@ -601,6 +695,10 @@ ecjp_return_code_t ecjp_read_array_element(const char input[],int index,ecjp_out
         ret = ECJP_EMPTY_STRING;
         return ret;
     }
+
+#ifdef DEBUG_VERBOSE        
+    ecjp_printf("%s - %d: input %s\n", __FUNCTION__,__LINE__, input);
+#endif
 
     memset(buffer, 0, sizeof(buffer));
 
@@ -955,7 +1053,7 @@ ecjp_return_code_t ecjp_read_array_element(const char input[],int index,ecjp_out
                             buffer[p_buffer] = input[p->index];
                             p_buffer++;
                             // check if this bracket closes the current object
-                            if (p->open_square_brackets == 1) {
+                            if (ecjp_peek_parse_stack(&(p->parse_stack),'[') == ECJP_BOOL_TRUE && p->open_square_brackets == 1) {
                                 p->status = ECJP_PA_WAIT_COMMA;
                             }
                         }
@@ -1197,7 +1295,7 @@ ecjp_return_code_t ecjp_read_array_element(const char input[],int index,ecjp_out
                         break;
 
                     default:
-                        ecjp_printf("%s - %d: Character %c unexpected\n", __FUNCTION__,__LINE__,input[p->index]);
+                        ecjp_printf("%s - %d: Character %c unexpected (index %d)\n", __FUNCTION__,__LINE__,input[p->index],p->index);
                         p->status = ECJP_PA_ERROR;
                         break;
                 }
@@ -1210,8 +1308,6 @@ ecjp_return_code_t ecjp_read_array_element(const char input[],int index,ecjp_out
                 break;
 
             case ECJP_PA_END:
-                // reached end of parsing
-                ecjp_printf("%s - %d: End of array parsing\n", __FUNCTION__,__LINE__);
                 // copy the last element if needed
                 // check if this is the requested element
                 num_elements++;
@@ -1222,6 +1318,8 @@ ecjp_return_code_t ecjp_read_array_element(const char input[],int index,ecjp_out
                 // reset buffer for next element
                 memset(buffer, 0, sizeof(buffer));
                 p_buffer = 0;
+                // reached end of parsing
+                ecjp_printf("%s - %d: End of array parsing\n", __FUNCTION__,__LINE__);
                 break;
 
             default:
@@ -1232,13 +1330,13 @@ ecjp_return_code_t ecjp_read_array_element(const char input[],int index,ecjp_out
 
     // check if we reach the end of parsing without manage the last state
     if (p->status == ECJP_PA_END && p_buffer != 0) {
-        ecjp_printf("%s - %d: End of array parsing\n", __FUNCTION__,__LINE__);
         // copy the last element if needed
         // check if this is the requested element
         num_elements++;
         ret = ecjp_internal_copy_array_element(buffer, p_buffer, index, num_elements, out);
+        ecjp_printf("%s - %d: End of array parsing\n", __FUNCTION__,__LINE__);
     } else {
-        if (p->status != ECJP_PS_END) {
+        if (p->status != ECJP_PA_END) {
             ecjp_printf("%s - %d: Incomplete JSON structure\n", __FUNCTION__,__LINE__);
             return ECJP_SYNTAX_ERROR;
         }
@@ -1421,8 +1519,7 @@ ecjp_value_type_t ecjp_get_key_and_value(const char input[], char *key, ecjp_key
     return type;
 }
 
-
-ecjp_return_code_t ecjp_check_and_load(const char *input, ecjp_key_elem_t **key_list, ecjp_check_result_t *res)
+ecjp_return_code_t ecjp_check_and_load(const char *input, ecjp_key_elem_t **key_list, ecjp_check_result_t *res, unsigned short int level)
 {
     ecjp_parser_data_t parser_data;
     ecjp_parser_data_t *p;
@@ -1769,7 +1866,7 @@ ecjp_return_code_t ecjp_check_and_load(const char *input, ecjp_key_elem_t **key_
                         // Record key type
                         key_token.type = ECJP_TYPE_OBJECT;
                         // Add key token to the list
-                        if (key_list != NULL)
+                        if (key_list != NULL && p->open_brackets <= level)
                         {
                             if (ecjp_add_node_end(key_list, &key_token) != 0) {
                                 res->err_pos = p->index;
@@ -1797,7 +1894,7 @@ ecjp_return_code_t ecjp_check_and_load(const char *input, ecjp_key_elem_t **key_
                         // Record key type
                         key_token.type = ECJP_TYPE_ARRAY;
                         // Add key token to the list
-                        if (key_list != NULL)
+                        if (key_list != NULL && p->open_brackets <= level)
                         {
                             if (ecjp_add_node_end(key_list, &key_token) != 0) {
                                 res->err_pos = p->index;
@@ -1820,7 +1917,7 @@ ecjp_return_code_t ecjp_check_and_load(const char *input, ecjp_key_elem_t **key_
                         // Record key type
                         key_token.type = ECJP_TYPE_STRING;
                         // Add key token to the list
-                        if (key_list != NULL)
+                        if (key_list != NULL && p->open_brackets <= level)
                         {
                             if (ecjp_add_node_end(key_list, &key_token) != 0) {
                                 res->err_pos = p->index;
@@ -1848,7 +1945,7 @@ ecjp_return_code_t ecjp_check_and_load(const char *input, ecjp_key_elem_t **key_
                                 key_token.type = ECJP_TYPE_NULL;
                             }
                             // Add key token to the list
-                            if (key_list != NULL)
+                            if (key_list != NULL && p->open_brackets <= level)
                             {
                                 if (ecjp_add_node_end(key_list, &key_token) != 0) {
                                     res->err_pos = p->index;
@@ -1876,7 +1973,7 @@ ecjp_return_code_t ecjp_check_and_load(const char *input, ecjp_key_elem_t **key_
                             // Record key type
                             key_token.type = ECJP_TYPE_NUMBER;
                             // Add key token to the list
-                            if (key_list != NULL)
+                            if (key_list != NULL && p->open_brackets <= level)
                             {
                                 if (ecjp_add_node_end(key_list, &key_token) != 0) {
                                     res->err_pos = p->index;
@@ -2202,12 +2299,12 @@ ecjp_return_code_t ecjp_check_and_load(const char *input, ecjp_key_elem_t **key_
 
 ecjp_return_code_t ecjp_check_syntax(const char *input, ecjp_check_result_t *res)
 {
-    return ecjp_check_and_load(input, NULL, res);
+    return ecjp_check_and_load(input, NULL, res, 0);
 }
 
-ecjp_return_code_t ecjp_load(const char *input, ecjp_key_elem_t **key_list, ecjp_check_result_t *res)
+ecjp_return_code_t ecjp_load(const char *input, ecjp_key_elem_t **key_list, ecjp_check_result_t *res, unsigned short int level)
 {
-    return ecjp_check_and_load(input, key_list, res);
+    return ecjp_check_and_load(input, key_list, res, level);
 }
 
 

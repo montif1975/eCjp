@@ -44,7 +44,7 @@ int main(int argc, char *argv[])
                     ptr[read_bytes] = '\0';
                     fclose(f);
                     fprintf(stdout, "\nTesting JSON file (%s) of size %ld bytes:\n", argv[1], file_size);
-                    ret = ecjp_check_and_load(ptr,&key_list,&results);
+                    ret = ecjp_check_and_load(ptr,&key_list,&results,1);
                     if (ret != ECJP_NO_ERROR) {
                         fprintf(stderr, "ecjp_check_syntax() on JSON file: FAILED with error code: %d\n", ret);
                         if (results.err_pos >= 0) {

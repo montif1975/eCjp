@@ -1,0 +1,13 @@
+{
+    "chiave_1" : [ -0.12e3, true],
+    "chiave_2": {}, 
+    "chiave_3": [],
+    "chiave_4": "ciao",
+    "chiave_5": 123,
+    "chiave_6": false,
+    "chiave_7": null, 
+    "chiave_8": { "a": [ "pippo" , 12, null, true, 0.134, -2.3 ], "pluto" : [ 1, "cane", "gatto", 25 ] },
+    "chiave_9": [ 1, 2, 3 ],
+    "chiave_10": [0.2, [], [3,5,7,-0.3]],
+    "chiave_11": {}
+}

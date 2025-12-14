@@ -7,7 +7,7 @@
 #define ECJP_MAX_INPUT_SIZE          1024*1024 // 1 MB
 #define ECJP_MAX_PRINT_COLUMNS       80
 #define ECJP_MAX_PARSE_STACK_DEPTH   2048
-#define ECJP_MAX_KEY_LEN             256
+#define ECJP_MAX_KEY_LEN             512
 #define ECJP_MAX_ARRAY_ELEM_LEN      1024*16 // 16 kB
 
 #define ECJP_TYPE_POS_KEY            unsigned short int
