@@ -177,12 +177,28 @@ ecjp_return_code_t ecjp_internal_copy_array_element(char *buffer, unsigned int p
 
 
 // External function definitions
+/*
+    Function: ecjp_dummy()
+        A simple dummy function to test library linkage.
+        Returns:
+        - ECJP_NO_ERROR on success.
+*/
 ecjp_return_code_t ecjp_dummy(void)
 {
     ecjp_printf("%s: Hello ecjp library!\n",__FUNCTION__);
     return ECJP_NO_ERROR;
 };
 
+/*
+    Function: ecjp_get_version()
+        This function retrieves the version of the eCjp library.
+        Parameters:
+        - major: Pointer to an integer to store the major version number.
+        - minor: Pointer to an integer to store the minor version number.
+        - patch: Pointer to an integer to store the patch version number.
+        Returns:
+        - ECJP_NO_ERROR on success.
+*/
 ecjp_return_code_t ecjp_get_version(int *major, int *minor, int *patch)
 {
     if (major != NULL) {
@@ -197,6 +213,16 @@ ecjp_return_code_t ecjp_get_version(int *major, int *minor, int *patch)
     return ECJP_NO_ERROR;
 };
 
+/*
+    Function: ecjp_get_version_string()
+        This function retrieves the version of the eCjp library as a string.
+        Parameters:
+        - version_string: Pointer to a character array to store the version string.
+        - max_length: Maximum length of the version string buffer.
+        Returns:
+        - ECJP_NO_ERROR on success.
+        - ECJP_NULL_POINTER if version_string is NULL or max_length is 0.
+*/
 ecjp_return_code_t ecjp_get_version_string(char *version_string, size_t max_length)
 {
     if (version_string == NULL || max_length == 0) {
@@ -206,6 +232,15 @@ ecjp_return_code_t ecjp_get_version_string(char *version_string, size_t max_leng
     return ECJP_NO_ERROR;
 };
 
+/*
+    Function: ecjp_show_error()
+        This function displays the input string with an indicator pointing to the error position.
+        Parameters:
+        - input: The JSON-like input string.
+        - err_pos: The position of the error in the input string.
+        Returns:
+        - ECJP_NO_ERROR on success.
+*/
 ecjp_return_code_t ecjp_show_error(const char *input, int err_pos)
 {
     int row, i, j, err_row, err_column;
@@ -250,6 +285,16 @@ ecjp_return_code_t ecjp_show_error(const char *input, int err_pos)
     return ECJP_NO_ERROR;
 };
 
+/*
+    Function: ecjp_print_keys()
+        This function prints all keys stored in the linked list along with their types.
+        Parameters:
+        - input: The JSON-like input string.
+        - key_list: Pointer to the linked list of keys.
+        Returns:
+        - ECJP_NO_ERROR on success.
+        - ECJP_NULL_POINTER if input or key_list is NULL.
+*/
 ecjp_return_code_t ecjp_print_keys(const char *input, ecjp_key_elem_t *key_list)
 {
     ecjp_key_elem_t *current = key_list;
@@ -273,7 +318,14 @@ ecjp_return_code_t ecjp_print_keys(const char *input, ecjp_key_elem_t *key_list)
     return ECJP_NO_ERROR;
 };
 
-
+/*
+    Function: ecjp_free_key_list()
+        This function frees the memory allocated for the linked list of keys.
+        Parameters:
+        - key_list: Pointer to a pointer to the linked list of keys.
+        Returns:
+        - ECJP_NO_ERROR on success.
+*/
 ecjp_return_code_t ecjp_free_key_list(ecjp_key_elem_t **key_list)
 {
     ecjp_key_elem_t *current;
@@ -294,41 +346,22 @@ ecjp_return_code_t ecjp_free_key_list(ecjp_key_elem_t **key_list)
     return ECJP_NO_ERROR;
 }
 
-
-ecjp_value_type_t ecjp_get_key(const char input[], char *key, ecjp_key_elem_t **key_list)
-{
-    ecjp_key_elem_t *current = *key_list;
-    char buffer[ECJP_MAX_KEY_LEN];
-    unsigned char len;
-    ecjp_value_type_t type = ECJP_TYPE_UNDEFINED;
-
-    if (input == NULL || key == NULL || key_list == NULL || *key_list == NULL) {
-        return type;
-    }
-
-    while (current != NULL) {
-        if(current->key.length >= ECJP_MAX_KEY_LEN) {
-            ecjp_printf("%s - %d: Key length exceeds maximum buffer size (%d), truncating output.\n",__FUNCTION__,__LINE__,(ECJP_MAX_KEY_LEN - 1));
-        }
-        memset(buffer, 0, sizeof(buffer));
-        len = (current->key.length < ECJP_MAX_KEY_LEN) ? current->key.length : (ECJP_MAX_KEY_LEN - 1);
-        strncpy(buffer, &input[current->key.start_pos], len);
-#ifdef DEBUG_VERBOSE
-        ecjp_printf("%s - %d: Comparing key '%s' with stored key '%s' for %d bytes\n",__FUNCTION__,__LINE__,key,buffer,len);
-#endif
-        if (strncmp(buffer, key, len) == 0) {
-            if (current->key.type != ECJP_TYPE_UNDEFINED) {
-                type = current->key.type;
-                return type;
-            }
-        }
-        current = current->next;
-    }   
-
-    return type;
-}
-
-ecjp_return_code_t ecjp_get_keys(const char input[],char *key,ecjp_key_elem_t **key_list,ecjp_outdata_t *out)
+/*
+    Function: ecjp_get_key()
+        This function retrieves a specific key from a JSON-like input string and stores its details in an output structure.
+        Parameters:
+        - input: The JSON-like input string.
+        - key: The specific key to search for. If NULL, retrieves the next key in the list starting from 'start' position.
+        - key_list: Pointer to a pointer to the linked list of keys.
+        - start: The position to start searching from.
+        - out: Pointer to an output structure to store the found key's details.
+        Returns:
+        - ECJP_NO_MORE_KEY if no more keys are found.
+        - ECJP_NO_ERROR if the specified key is found and stored in out.
+        - ECJP_GENERIC_ERROR if an error occurs.
+        - ECJP_NULL_POINTER if any input pointer is NULL.
+*/
+ecjp_return_code_t ecjp_get_key(const char input[],char *key,ecjp_key_elem_t **key_list,ECJP_TYPE_POS_KEY start,ecjp_outdata_t *out)
 {
     ecjp_key_elem_t *current = *key_list;
     char buffer[ECJP_MAX_KEY_LEN];
@@ -341,9 +374,9 @@ ecjp_return_code_t ecjp_get_keys(const char input[],char *key,ecjp_key_elem_t **
         return ret;
     }
     
-    if (out->last_pos != 0) {
+    if (start != 0) {
         // walk the list to find the start position
-        while ((current != NULL) && (current->key.start_pos != out->last_pos)) {
+        while ((current != NULL) && (current->key.start_pos != start)) {
             current = current->next;
         }
         // skip to next token
@@ -399,6 +432,19 @@ ecjp_return_code_t ecjp_get_keys(const char input[],char *key,ecjp_key_elem_t **
     return ret;
 }
 
+/*
+ Function: ecjp_read_key()
+    This function reads the value associated with a specific key from a JSON-like input string.
+    Parameters:
+    - input: The JSON-like input string.
+    - in: Pointer to an input structure containing key details.
+    - out: Pointer to an output structure to store the key's value details.
+    Returns:
+    - ECJP_NO_ERROR if the key's value is successfully read and stored in out.
+    - ECJP_NULL_POINTER if any input pointer is NULL.
+    - ECJP_NO_SPACE_IN_BUFFER_VALUE if the output buffer is insufficient.
+    - ECJP_EMPTY_STRING if the key has no associated value (should not happen in well-formed JSON).
+*/
 ecjp_return_code_t ecjp_read_key(const char input[],ecjp_indata_t *in,ecjp_outdata_t *out)
 {
     ecjp_return_code_t ret = ECJP_NO_ERROR;
@@ -578,13 +624,24 @@ ecjp_return_code_t ecjp_read_key(const char input[],ecjp_indata_t *in,ecjp_outda
     return ret;
 }
 
-// TODO in progress function to get all keys and their values
+/*
+    Function: ecjp_get_keys_and_value()
+        This function retrieves all keys and their associated values from a JSON-like input string and prints them to stdout.
+        Parameters:
+        - ptr: The JSON-like input string.
+        - key_list: Pointer to the linked list of keys.
+        Returns:
+        - ECJP_NO_ERROR on success.
+        - ECJP_NO_MORE_KEY when all keys have been processed.
+*/
 ecjp_return_code_t ecjp_get_keys_and_value(char *ptr,ecjp_key_elem_t *key_list)
 {
     ecjp_outdata_t out_get;
     ecjp_outdata_t out_read, out_array;
     ecjp_indata_t in;
     ecjp_return_code_t ret;
+    ECJP_TYPE_POS_KEY start = 0;
+    int key_count = 0;
 
     memset(&out_get,0,sizeof(out_get));
     out_get.value = malloc(ECJP_MAX_KEY_LEN);
@@ -606,27 +663,23 @@ ecjp_return_code_t ecjp_get_keys_and_value(char *ptr,ecjp_key_elem_t *key_list)
     ret = ECJP_NO_ERROR;
 
     do {
-        ret = ecjp_get_keys(ptr,NULL,&key_list,&out_get);
+        ret = ecjp_get_key(ptr,NULL,&key_list,start,&out_get);
         if (ret != ECJP_NO_MORE_KEY) {
-#if 0            
+            key_count++;
             fprintf(stdout,
-                    "Find key: %s [error_code=%d type=%d last_pos=%d]\n",
+                    "Find key #%d: \"%s\" [error_code=%d type=%s length=%d last_pos=%d] ",
+                    key_count,
                     (char *)out_get.value,
                     out_get.error_code,
-                    out_get.type,
+                    ecjp_type[out_get.type],
+                    out_get.length,
                     out_get.last_pos);
-#endif
             // read value for this key
             in.length = out_get.length;
             in.type = out_get.type;
             in.pos = out_get.last_pos;
+            start = in.pos; // update start position for next search
             strncpy(in.key,out_get.value,out_get.value_size);
-            fprintf(stdout,
-                    "Key %s lenght: %d type: %d pos: %d ",
-                    in.key,
-                    in.length,
-                    in.type,
-                    in.pos);
             if(ecjp_read_key(ptr,&in,&out_read) == ECJP_NO_ERROR) {
                 fprintf(stdout,
                         "value = %s\n",
@@ -634,8 +687,7 @@ ecjp_return_code_t ecjp_get_keys_and_value(char *ptr,ecjp_key_elem_t *key_list)
                 if (in.type == ECJP_TYPE_ARRAY) {
                     int index = 0;
                     while (ecjp_read_array_element(out_read.value,index,&out_array) == ECJP_NO_ERROR) {
-                        fprintf(stdout, "Array element #%d read successfully.\n",index);
-                        fprintf(stdout, "Type = %d, Value = %s\n", out_array.type, (char *)out_array.value);
+                        fprintf(stdout, "\tArray element #%d Type = %s, Value = %s\n", index, ecjp_type[out_array.type], (char *)out_array.value);
                         // reset out_read
                         out_array.error_code = ECJP_NO_ERROR;
                         out_array.last_pos = 0;
@@ -650,10 +702,13 @@ ecjp_return_code_t ecjp_get_keys_and_value(char *ptr,ecjp_key_elem_t *key_list)
                         "Error reading key %s. Error code = %d\n",
                         in.key,
                         out_read.error_code);
+                break;
             }
-            // reset out_get but not the last position
+            // reset out_get
             out_get.error_code = ECJP_NO_ERROR;
             out_get.type = ECJP_TYPE_UNDEFINED;
+            out_get.length = 0;
+            out_get.last_pos = 0;
             memset(out_get.value,0,out_get.value_size);
             // reset out_read
             out_read.error_code = ECJP_NO_ERROR;
@@ -672,6 +727,18 @@ ecjp_return_code_t ecjp_get_keys_and_value(char *ptr,ecjp_key_elem_t *key_list)
     return ret;
 }
 
+/*
+    Function: ecjp_read_array_element()
+        This function reads a specific element from a JSON-like array string.
+        Parameters:
+        - input: The JSON-like array string.
+        - index: The index of the element to read. Use ECJP_ARRAY_NO_INDEX to indicate no specific index.
+        - out: Pointer to an output structure to store the element's details.
+        Returns:
+        - ECJP_NO_ERROR if the element is successfully read and stored in out.
+        - ECJP_NULL_POINTER if any input pointer is NULL.
+        - ECJP_EMPTY_STRING if no index is specified.
+*/
 ecjp_return_code_t ecjp_read_array_element(const char input[],int index,ecjp_outdata_t *out)
 {
     ecjp_return_code_t ret = ECJP_NO_ERROR;
@@ -1319,7 +1386,9 @@ ecjp_return_code_t ecjp_read_array_element(const char input[],int index,ecjp_out
                 memset(buffer, 0, sizeof(buffer));
                 p_buffer = 0;
                 // reached end of parsing
+#ifdef DEBUG_VERBOSE
                 ecjp_printf("%s - %d: End of array parsing\n", __FUNCTION__,__LINE__);
+#endif
                 break;
 
             default:
@@ -1334,7 +1403,9 @@ ecjp_return_code_t ecjp_read_array_element(const char input[],int index,ecjp_out
         // check if this is the requested element
         num_elements++;
         ret = ecjp_internal_copy_array_element(buffer, p_buffer, index, num_elements, out);
+#ifdef DEBUG_VERBOSE
         ecjp_printf("%s - %d: End of array parsing\n", __FUNCTION__,__LINE__);
+#endif
     } else {
         if (p->status != ECJP_PA_END) {
             ecjp_printf("%s - %d: Incomplete JSON structure\n", __FUNCTION__,__LINE__);
@@ -1347,178 +1418,29 @@ ecjp_return_code_t ecjp_read_array_element(const char input[],int index,ecjp_out
     }
     
     if (index > (num_elements - 1)) {
+#ifdef DEBUG_VERBOSE
         ecjp_printf("%s - %d: Requested index %d exceeds number of elements %d\n", __FUNCTION__,__LINE__,index,(num_elements-1));
+#endif
         return ECJP_INDEX_OUT_OF_BOUNDS;
     }  
 
     return ret;
 }
 
-ecjp_value_type_t ecjp_get_key_and_value(const char input[], char *key, ecjp_key_elem_t **key_list, void *value, size_t value_size)
-{
-    ecjp_key_elem_t *current = *key_list;
-    char buffer[ECJP_MAX_KEY_LEN];
-    unsigned char len;
-    char *ptr; // index that walks through input
-    char *ptr_value; // pointer to value start
-    size_t vsize = 0;
-    ecjp_value_type_t type = ECJP_TYPE_UNDEFINED;
-    unsigned short int open_brackets = 0;
-
-    if (input == NULL || key == NULL || key_list == NULL || *key_list == NULL) {
-        return type;
-    }
-
-    while (current != NULL) {
-        if(current->key.length >= ECJP_MAX_KEY_LEN) {
-            ecjp_printf("%s - %d: Key length exceeds maximum buffer size (%d), truncating output.\n",__FUNCTION__,__LINE__,(ECJP_MAX_KEY_LEN - 1));
-        }
-        memset(buffer, 0, sizeof(buffer));
-        len = (current->key.length < ECJP_MAX_KEY_LEN) ? current->key.length : (ECJP_MAX_KEY_LEN - 1);
-        strncpy(buffer, &input[current->key.start_pos], len);
-#ifdef DEBUG_VERBOSE
-        ecjp_printf("%s - %d: Comparing key '%s' with stored key '%s' for %d bytes\n",__FUNCTION__,__LINE__,key,buffer,len);
-#endif
-        if (strncmp(buffer, key, len) == 0) {
-            if (current->key.type != ECJP_TYPE_UNDEFINED) {
-                type = current->key.type; // return last found type
-                if(value == NULL || value_size == 0) {
-                    ecjp_printf("%s - %d: No buffer supplied for store value\n", __FUNCTION__,__LINE__);
-                    return type;
-                }
-                else {
-                    // retrieve value
-                    ptr = (char *)&input[current->key.start_pos + current->key.length + 1]; // skip key and quote
-                    // find colon
-                    while (*ptr != ':' && *ptr != '\0') {
-                        ptr++;
-                    }
-                    if(*ptr == ':') {
-                        ptr++; // skip colon
-                    }
-                    // calculate value size
-                    switch (type) {
-                        case ECJP_TYPE_STRING:
-                            while(ecjp_is_whitespace(*ptr) == ECJP_BOOL_TRUE) {
-                                ptr++;
-                            }
-                            if (*ptr == '"') {
-                                ptr++;
-                                ptr_value = ptr;
-                                while (*ptr != '"' && *ptr != '\0') {
-                                    vsize++;
-                                    ptr++;
-                                }
-                            }   
-                            break;
-
-                        case ECJP_TYPE_NUMBER:
-                            while(ecjp_is_whitespace(*ptr) == ECJP_BOOL_TRUE) {
-                                ptr++;
-                            }
-                            ptr_value = ptr;
-                            while ((*ptr >= '0' && *ptr <= '9') || *ptr == '-' || *ptr == '+' || *ptr == '.' || *ptr == 'e' || *ptr == 'E') {
-                                vsize++;
-                                ptr++;
-                            }
-                            break;
-                        
-                        case ECJP_TYPE_BOOL:
-                            while(ecjp_is_whitespace(*ptr) == ECJP_BOOL_TRUE) {
-                                ptr++;
-                            }
-                            ptr_value = ptr;
-                            if (strncmp(ptr, "true", 4) == 0 || strncmp(ptr, "false", 5) == 0) {
-                                vsize = (strncmp(ptr, "true", 4) == 0) ? 4 : 5;
-                            }
-                            break;
-
-                        case ECJP_TYPE_NULL:
-                            while(ecjp_is_whitespace(*ptr) == ECJP_BOOL_TRUE) {
-                                ptr++;
-                            }
-                            ptr_value = ptr;
-                            vsize = 4; // "null"
-                            break;
-
-                        case ECJP_TYPE_OBJECT:
-                            while(ecjp_is_whitespace(*ptr) == ECJP_BOOL_TRUE) {
-                                ptr++;
-                            }
-                            ptr_value = ptr;
-                            if(*ptr == '{') {
-                                vsize = 1; // at least the opening bracket
-                                open_brackets = 1;
-                                ptr++;
-                                while ((open_brackets != 0) && (*ptr != '\0')) {
-                                    if(*ptr == '}') {
-                                        open_brackets--;
-                                    } else if (*ptr == '{') {
-                                        open_brackets++;
-                                    }
-                                    vsize++;
-                                    ptr++;
-                                }
-                            } else {
-                                vsize = 0;
-                            }   
-                            break;
-
-                        case ECJP_TYPE_ARRAY:
-                            while(ecjp_is_whitespace(*ptr) == ECJP_BOOL_TRUE) {
-                                ptr++;
-                            }
-                            ptr_value = ptr;
-                            if(*ptr == '[') {
-                                vsize = 1; // at least the opening bracket
-                                open_brackets = 1;
-                                ptr++;
-                                while ((open_brackets != 0) && (*ptr != '\0')) {
-                                    if(*ptr == ']') {
-                                        open_brackets--;
-                                    } else if (*ptr == '[') {
-                                        open_brackets++;
-                                    }   
-                                    vsize++;
-                                    ptr++;
-                                }
-                            } else {
-                                vsize = 0;
-                            }
-                            break;
-
-                        default:
-                            vsize = 0;
-                            break;
-                    }
-#ifdef DEBUG_VERBOSE
-                    ecjp_printf("%s - %d: value=%p value_size=%d vsize=%d ptr_value=%p ptr=%p\n",
-                                __FUNCTION__,
-                                __LINE__,
-                                value,
-                                (int)value_size,
-                                (int)vsize,
-                                ptr_value,
-                                ptr);
-#endif
-                    if (value_size <= vsize) {
-                        vsize = value_size - 1; // leave space for null terminator
-                        memcpy(value, ptr_value, value_size);
-                        ((char *)value)[vsize] = '\0';
-                        printf("%s: Value buffer too small, truncated to %d bytes\n", __FUNCTION__, (int)vsize);
-                    }
-                    else
-                        memcpy(value, ptr_value, vsize);
-                    return type;
-                }
-            }
-        }
-        current = current->next;
-    }   
-
-    return type;
-}
-
+/*
+    Function: ecjp_check_and_load()
+        This function checks the syntax of a JSON-like input string and prepares it for further processing.
+        Parameters:
+        - input: The JSON-like input string to be checked and loaded.
+        - key_list: Pointer to a list of key elements loaded with the keys found in the input string.
+        - res: Pointer to a structure to store the result of the check, including any error position.
+        - level: The level of checking to be performed; used to manage keys inside nested structures.
+        Returns:
+        - ECJP_NO_ERROR if the input string is valid.
+        - ECJP_NULL_POINTER if any input pointer is NULL.
+        - ECJP_EMPTY_STRING if the input string is empty.
+        - ECJP_SYNTAX_ERROR if there is a syntax error in the input string.
+*/
 ecjp_return_code_t ecjp_check_and_load(const char *input, ecjp_key_elem_t **key_list, ecjp_check_result_t *res, unsigned short int level)
 {
     ecjp_parser_data_t parser_data;
@@ -2297,11 +2219,20 @@ ecjp_return_code_t ecjp_check_and_load(const char *input, ecjp_key_elem_t **key_
     return ECJP_NO_ERROR;
 };
 
+/*
+    Function: ecjp_check_syntax
+    This function call ecjp_check_and_load() without pointer to store the keys to perform only syntax checking.
+*/
 ecjp_return_code_t ecjp_check_syntax(const char *input, ecjp_check_result_t *res)
 {
     return ecjp_check_and_load(input, NULL, res, 0);
 }
 
+/*
+    Function: ecjp_load
+    This function call ecjp_check_and_load() with pointer to store the keys to perform syntax checking
+    and store all keys found in the input string at nested level less than or equal to the specified level.
+*/
 ecjp_return_code_t ecjp_load(const char *input, ecjp_key_elem_t **key_list, ecjp_check_result_t *res, unsigned short int level)
 {
     return ecjp_check_and_load(input, key_list, res, level);

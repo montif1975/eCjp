@@ -1,6 +1,6 @@
 #!/bin/sh
 
-PROG="example_ecjp"
+PROG="example_ecjp_2"
 BASE_DIR=".."
 #echo Work dir = $BASE_DIR
 BUILD_DIR="${BASE_DIR}/build/src"

@@ -173,15 +173,14 @@ ecjp_return_code_t ecjp_get_version_string(char *version_string, size_t max_leng
 ecjp_return_code_t ecjp_show_error(const char *input, int err_pos);
 ecjp_return_code_t ecjp_print_keys(const char *input, ecjp_key_elem_t *key_list);
 ecjp_return_code_t ecjp_free_key_list(ecjp_key_elem_t **key_list);
-ecjp_value_type_t ecjp_get_key(const char input[], char *key, ecjp_key_elem_t **key_list);
-ecjp_return_code_t ecjp_get_keys(const char input[],char *key,ecjp_key_elem_t **key_list,ecjp_outdata_t *out);
+ecjp_return_code_t ecjp_get_key(const char input[],char *key,ecjp_key_elem_t **key_list,ECJP_TYPE_POS_KEY start,ecjp_outdata_t *out);
 ecjp_return_code_t ecjp_read_key(const char input[],ecjp_indata_t *in,ecjp_outdata_t *out);
 ecjp_return_code_t ecjp_read_array_element(const char input[],int index,ecjp_outdata_t *out);
-ecjp_value_type_t ecjp_get_key_and_value(const char input[], char *key, ecjp_key_elem_t **key_list, void *value, size_t value_size);
 ecjp_return_code_t ecjp_get_keys_and_value(char *ptr,ecjp_key_elem_t *key_list);
 ecjp_return_code_t ecjp_check_and_load(const char *input, ecjp_key_elem_t **key_list, ecjp_check_result_t *res, unsigned short int level);
 ecjp_return_code_t ecjp_check_syntax(const char *input, ecjp_check_result_t *res);
 ecjp_return_code_t ecjp_load(const char *input, ecjp_key_elem_t **key_list, ecjp_check_result_t *res, unsigned short int level);
+
 
 #ifdef __cplusplus
 }
