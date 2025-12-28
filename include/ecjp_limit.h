@@ -9,6 +9,7 @@
 #define ECJP_MAX_PARSE_STACK_DEPTH   2048
 #define ECJP_MAX_KEY_LEN             512
 #define ECJP_MAX_ARRAY_ELEM_LEN      1024*16 // 16 kB
+#define ECJP_MAX_ITEM_LEN            1024*16 // 16 kB
 #define ECJP_MAX_NESTED_LEVEL        1024
 
 #define ECJP_TYPE_POS_KEY            unsigned short int
@@ -21,6 +22,7 @@
 #define ECJP_MAX_PARSE_STACK_DEPTH   64
 #define ECJP_MAX_KEY_LEN             32
 #define ECJP_MAX_ARRAY_ELEM_LEN      256
+#define ECJP_MAX_ITEM_LEN            512
 #define ECJP_MAX_NESTED_LEVEL        8
 
 #define ECJP_TYPE_POS_KEY            unsigned short int  
@@ -28,11 +30,12 @@
 
 #else
 // run with default
-#define ECJP_MAX_INPUT_SIZE          2048 // 1 kB
+#define ECJP_MAX_INPUT_SIZE          8192 // 1 kB
 #define ECJP_MAX_PRINT_COLUMNS       80
 #define ECJP_MAX_PARSE_STACK_DEPTH   128
 #define ECJP_MAX_KEY_LEN             64
-#define ECJP_MAX_ARRAY_ELEM_LEN      512
+#define ECJP_MAX_ITEM_LEN            512
+#define ECJP_MAX_ARRAY_ELEM_LEN      1024
 #define ECJP_MAX_NESTED_LEVEL        12
 
 #define ECJP_TYPE_POS_KEY            unsigned short int  

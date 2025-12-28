@@ -1,0 +1,43 @@
+[
+    {
+        "Name" : "Giuseppe",
+        "Surname": "Garibaldi", 
+        "Age": 48,
+        "Address": "Via Roma 1",
+        "City": "Roma",
+        "Zip": "00100"
+    },
+    {
+        "Name" : "Piero",
+        "Surname": "Rossi", 
+        "Age": 35,
+        "Address": "Via Nazionale 21",
+        "City": "Milano",
+        "Zip": "00201"
+    },
+    {
+        "Name" : "Mario",
+        "Surname": "Bianchi", 
+        "Age": 78,
+        "Address": "Piazza Dante 6",
+        "City": "Napoli",
+        "Zip": "00301"
+    },
+    {
+        "Name" : "Nicola",
+        "Surname": "Verdi", 
+        "Age": 52,
+        "Address": "Corso Venezia 10",
+        "City": "Torino",
+        "Zip": "00401"
+    },
+    {
+        "Name" : "Maria",
+        "Surname": "Esposito", 
+        "Age": 30,
+        "Address": "Via Vesuvio 5",
+        "City": "Napoli",
+        "Zip": "00302"
+    }
+]
+

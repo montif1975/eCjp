@@ -8,6 +8,34 @@ void usage(char *prog_name)
     fprintf(stderr, "Usage: %s [filename]\n", prog_name);
 }
 
+void reset_outdata(ecjp_outdata_t *out)
+{
+    if (out != NULL) {
+        out->error_code = ECJP_NO_ERROR;
+        out->last_pos = 0;
+        out->length = 0;
+        out->type = ECJP_TYPE_UNDEFINED;
+        if (out->value != NULL && out->value_size > 0) {
+            memset(out->value, 0, out->value_size);
+        }
+    }
+    return;
+}
+
+ecjp_return_code_t read_single_array_element(const char input[], int index, ecjp_outdata_t *out)
+{
+    reset_outdata(out);
+    if (ecjp_read_array_element(input, index, out) == ECJP_NO_ERROR)
+    {
+        fprintf(stdout, "Array element #%d read successfully.\n", index);
+        fprintf(stdout, "Type = %d, Value = %s\n", out->type, (char *)out->value);
+        return ECJP_NO_ERROR;
+    } else {
+        fprintf(stdout, "Failed to read array element #%d. Error code = %d\n", index, out->error_code);
+    }
+    return out->error_code;
+}
+
 int main(int argc, char *argv[])
 {
     ecjp_return_code_t ret;
@@ -70,11 +98,14 @@ int main(int argc, char *argv[])
                     else {
                         fprintf(stdout, "ecjp_check_syntax() on JSON file: SUCCEEDED.\n");
                         fprintf(stdout, "ecjp_check_syntax() - num. keys found = %d, struct type = %d.\n",results.num_keys,results.struct_type);
-                        if ((results.struct_type == ECJP_ST_OBJ) && (results.num_keys != 0)) {
+                        if (results.struct_type == ECJP_ST_OBJ) {
                             if (key_list != NULL) {
-                                ecjp_print_keys(ptr, key_list);
                                 ecjp_free_key_list(&key_list);
-                            }    
+                            }
+                            fprintf(stdout, "Skip object structure.\n");
+                            free(ptr);
+                            ptr = NULL;
+                            return 0;
                         } else if (results.struct_type == ECJP_ST_ARRAY) {
                             out.error_code = ECJP_NO_ERROR;
                             out.value = (char *)malloc(ECJP_MAX_ARRAY_ELEM_LEN);
@@ -83,13 +114,14 @@ int main(int argc, char *argv[])
                                 fprintf(stderr, "Memory allocation failed for array element value buffer\n");
                                 return -1;
                             }
-                            fprintf(stdout, "\nReading array elements:\n");
-                            while (ecjp_read_array_element(ptr,index,&out) == ECJP_NO_ERROR) {
-                                fprintf(stdout, "Array element #%d read successfully.\n",index);
-                                fprintf(stdout, "Type = %d, Value = %s\n", out.type, (char *)out.value);
-                                out.value_size = ECJP_MAX_ARRAY_ELEM_LEN;
-                                index++;
-                            }
+                            fprintf(stdout, "\nAccessing some array elements [0,1,2,3,5,8]:\n");
+                            read_single_array_element(ptr, 0, &out);
+                            read_single_array_element(ptr, 1, &out);
+                            read_single_array_element(ptr, 2, &out);
+                            read_single_array_element(ptr, 3, &out);
+                            read_single_array_element(ptr, 5, &out);
+                            read_single_array_element(ptr, 8, &out);
+
                             free(out.value);
                             out.value = NULL;
                         }
