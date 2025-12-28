@@ -211,7 +211,17 @@ int ecjp_add_node_end(ecjp_key_elem_t **head, ecjp_key_token_t *data)
     return 0;
 }
 
-int ecjp_add_node_end_2(ecjp_item_elem_t **head, ecjp_item_token_t *data)
+/*
+ * Function: ecjp_add_node_item_end()
+        This function adds a new item token node to the end of the linked list.
+        Parameters:
+        - head: Pointer to the head of the linked list.
+        - data: Pointer to the item token data to add.
+        Returns:
+        - 0 on success.
+        - -1 on memory allocation failure.
+*/
+int ecjp_add_node_item_end(ecjp_item_elem_t **head, ecjp_item_token_t *data)
 {
     ecjp_item_elem_t  *new_node;
     ecjp_item_elem_t  *current;
@@ -2381,6 +2391,24 @@ ecjp_return_code_t ecjp_load(const char *input, ecjp_key_elem_t **key_list, ecjp
     return ecjp_check_and_load(input, key_list, res, level);
 }
 
+/******* ALTERNATIVE IMPLEMENTATION *********/
+/* 
+In this implementation, we parse the input string and extract item tokens (values) instead of keys.
+We store these item tokens in a linked list passed as a parameter.
+This implementation is useful when the focus is on the values rather than the keys but use much more memory.
+*/
+
+/*
+ *  Function: ecjp_store_tmp_item
+    This function store a character in the temporary buffer for building an item token value.
+    Parameters:
+    - buffer: The temporary buffer to store the character.
+    - p_buffer: Pointer to the current position in the buffer.
+    - c: The character to be stored.
+    Returns:
+    - ECJP_NO_ERROR if the character is stored successfully.
+    - ECJP_NO_SPACE_IN_BUFFER_VALUE if the buffer exceeds maximum length.
+*/
 ecjp_return_code_t ecjp_store_tmp_item(char *buffer, int *p_buffer, char c)
 {
     if(*p_buffer >= (ECJP_MAX_ITEM_LEN - 1)) {
@@ -2393,6 +2421,14 @@ ecjp_return_code_t ecjp_store_tmp_item(char *buffer, int *p_buffer, char c)
     return ECJP_NO_ERROR;
 }
 
+/*
+ *  Function: ecjp_load_item
+    This function load an item token from the temporary buffer.
+    Parameters:
+    - token: Pointer to the item token structure to be loaded.
+    - tmp_buffer: The temporary buffer containing the item value.
+    - p_buffer: The size of the item value in the buffer.
+*/
 void ecjp_load_item(ecjp_item_token_t *token, char *tmp_buffer, int p_buffer)
 {
     // allocate memory for token value, copy tmp_buffer to token value
@@ -2407,6 +2443,13 @@ void ecjp_load_item(ecjp_item_token_t *token, char *tmp_buffer, int p_buffer)
     return;
 }
 
+/*
+ *  Function: ecjp_reset_tmp_buffer
+    This function reset the temporary buffer for building an item token value.
+    Parameters:
+    - tmp_buffer: The temporary buffer to be reset.
+    - p_buffer: Pointer to the current position in the buffer to be reset.
+*/
 void ecjp_reset_tmp_buffer(char *tmp_buffer, int *p_buffer)
 {
     memset(tmp_buffer, 0, ECJP_MAX_ITEM_LEN);
@@ -2414,6 +2457,12 @@ void ecjp_reset_tmp_buffer(char *tmp_buffer, int *p_buffer)
     return;
 }
 
+/*
+ *  Function: ecjp_init_item_token
+    This function initialize an item token structure.
+    Parameters:
+    - token: Pointer to the item token structure to be initialized.
+*/
 void ecjp_init_item_token(ecjp_item_token_t *token)
 {
     token->type = ECJP_TYPE_UNDEFINED;
@@ -2422,6 +2471,12 @@ void ecjp_init_item_token(ecjp_item_token_t *token)
     return;
 }
 
+/*
+ *  Function: ecjp_free_item_token
+    This function free the memory allocated for an item token structure.
+    Parameters:
+    - token: Pointer to the item token structure to be freed.
+*/
 void ecjp_free_item_token(ecjp_item_token_t *token)
 {
     if (token->value != NULL) {
@@ -2433,6 +2488,14 @@ void ecjp_free_item_token(ecjp_item_token_t *token)
     return;
 }
 
+/* 
+ *  Function: ecjp_free_item_list
+    This function free the memory allocated for a list of item elements.
+    Parameters:
+    - item_list: Pointer to the list of item elements to be freed.
+    Returns:
+    - ECJP_NO_ERROR if the list is freed successfully.
+*/
 ecjp_return_code_t ecjp_free_item_list(ecjp_item_elem_t **item_list)
 {
     ecjp_item_elem_t *current;
@@ -2454,7 +2517,20 @@ ecjp_return_code_t ecjp_free_item_list(ecjp_item_elem_t **item_list)
     return ECJP_NO_ERROR;
 }
 
-
+/* 
+ * Function: ecjp_check_and_load_2
+    This function checks the syntax of a JSON-like input string and loads item tokens (values)
+    into a linked list if the syntax is valid.
+    Parameters:
+    - input: The JSON-like input string to be checked and loaded.
+    - item_list: Pointer to a list of item elements loaded with the item tokens found in the input string.
+    - res: Pointer to a structure to store the result of the check, including any error position.
+    Returns:
+    - ECJP_NO_ERROR if the input string is valid.
+    - ECJP_NULL_POINTER if any input pointer is NULL.
+    - ECJP_EMPTY_STRING if the input string is empty.
+    - ECJP_SYNTAX_ERROR if there is a syntax error in the input string.
+*/
 ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **item_list, ecjp_check_result_t *res)
 {
     ecjp_parser_data_t parser_data;
@@ -2577,28 +2653,6 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
                         } else {
                             p->status = ECJP_PS_WAIT_COMMA;
                             ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
-#if 0
-                            if (ecjp_peek_parse_stack(&(p->parse_stack),'{') == ECJP_BOOL_TRUE && p->open_brackets == 1) {
-                                if (item_list != NULL)
-                                {
-                                    ecjp_load_item(token, tmp_buffer, p_buffer);
-                                    // Add item token to the list
-                                    if (ecjp_add_node_end_2(item_list, &token) != 0) {
-                                        res->err_pos = p->index;
-                                        ecjp_printf("%s - %d: Failed to add item token to the list\n", __FUNCTION__,__LINE__);
-                                        return ECJP_GENERIC_ERROR;
-                                    } else {
-#ifdef DEBUG_VERBOSE
-                                        ecjp_printf("%s - %d: Added item token to the list, item_list = %p\n", __FUNCTION__,__LINE__, (void *)*item_list);
-#endif
-                                        res->num_keys++;
-                                    }
-                                }
-                                // Reset token for next item
-                                ecjp_init_item_token(&token);
-                                ecjp_reset_tmp_buffer(tmp_buffer, &p_buffer);
-                            }
-#endif
                         }
                         break;
 
@@ -2855,26 +2909,6 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
                             return ECJP_GENERIC_ERROR;
                         }
                         p->status = ECJP_PS_IN_OBJECT;
-#if 0
-                        // Record key type
-                        key_token.type = ECJP_TYPE_OBJECT;
-                        // Add key token to the list
-                        if (key_list != NULL && p->open_brackets <= level)
-                        {
-                            if (ecjp_add_node_end(key_list, &key_token) != 0) {
-                                res->err_pos = p->index;
-                                ecjp_printf("%s - %d: Failed to add key token to the list\n", __FUNCTION__,__LINE__);
-                                return ECJP_GENERIC_ERROR;
-                            } else {
-#ifdef DEBUG_VERBOSE
-                                ecjp_printf("%s - %d: Added object key token to the list, key_list = %p\n", __FUNCTION__,__LINE__, (void *)*key_list);
-#endif
-                                res->num_keys++;
-                            }
-                        }
-                        // Reset key_token for future keys
-                        memset(&key_token, 0, sizeof(ecjp_key_token_t));
-#endif
                         ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
                         break;
 
@@ -2886,52 +2920,12 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
                             return ECJP_GENERIC_ERROR;
                         }
                         p->status = ECJP_PS_IN_ARRAY;
-#if 0
-                        // Record key type
-                        key_token.type = ECJP_TYPE_ARRAY;
-                        // Add key token to the list
-                        if (key_list != NULL && p->open_brackets <= level)
-                        {
-                            if (ecjp_add_node_end(key_list, &key_token) != 0) {
-                                res->err_pos = p->index;
-                                ecjp_printf("%s - %d: Failed to add key token to the list\n", __FUNCTION__,__LINE__);
-                                return ECJP_GENERIC_ERROR;
-                            } else {
-#ifdef DEBUG_VERBOSE
-                                ecjp_printf("%s - %d: Added object key token to the list, key_list = %p\n", __FUNCTION__,__LINE__, (void *)*key_list);
-#endif
-                                res->num_keys++;
-                            }
-                        }
-                        // Reset key_token for future keys
-                        memset(&key_token, 0, sizeof(ecjp_key_token_t));
-#endif
                         ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
                         break;
 
                     case '"':
                         p->flags.in_string = 1;
                         p->status = ECJP_PS_IN_VALUE;
-#if 0
-                        // Record key type
-                        key_token.type = ECJP_TYPE_STRING;
-                        // Add key token to the list
-                        if (key_list != NULL && p->open_brackets <= level)
-                        {
-                            if (ecjp_add_node_end(key_list, &key_token) != 0) {
-                                res->err_pos = p->index;
-                                ecjp_printf("%s - %d: Failed to add key token to the list\n", __FUNCTION__,__LINE__);
-                                return ECJP_GENERIC_ERROR;
-                            } else {
-#ifdef DEBUG_VERBOSE
-                                ecjp_printf("%s - %d: Added object key token to the list, key_list = %p\n", __FUNCTION__,__LINE__, (void *)*key_list);
-#endif
-                                res->num_keys++;
-                            }
-                        }
-                        // Reset key_token for future keys
-                        memset(&key_token, 0, sizeof(ecjp_key_token_t));
-#endif
                         ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
                         break;
 
@@ -2939,30 +2933,6 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
                         if (strncmp(&input[p->index], "true", 4) == 0 || strncmp(&input[p->index], "false", 5) == 0 || strncmp(&input[p->index], "null", 4) == 0) {
                             // valid value
                             p->status = ECJP_PS_WAIT_COMMA;
-#if 0
-                            // Record key type
-                            if ((input[p->index] == 't') || (input[p->index] == 'f')) {
-                                key_token.type = ECJP_TYPE_BOOL;
-                            } else {
-                                key_token.type = ECJP_TYPE_NULL;
-                            }
-                            // Add key token to the list
-                            if (key_list != NULL && p->open_brackets <= level)
-                            {
-                                if (ecjp_add_node_end(key_list, &key_token) != 0) {
-                                    res->err_pos = p->index;
-                                    ecjp_printf("%s - %d: Failed to add key token to the list\n", __FUNCTION__,__LINE__);
-                                    return ECJP_GENERIC_ERROR;
-                                } else {
-#ifdef DEBUG_VERBOSE
-                                    ecjp_printf("%s - %d: Added object key token to the list, key_list = %p\n", __FUNCTION__,__LINE__, (void *)*key_list);
-#endif
-                                    res->num_keys++;
-                                }
-                            }
-                            // Reset key_token for future keys
-                            memset(&key_token, 0, sizeof(ecjp_key_token_t));
-#endif
                             if (strncmp(&input[p->index], "true", 4) == 0) {
                                 for (int i = 0; i < 4; i++) {
                                     ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index + i]);
@@ -2986,26 +2956,6 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
                                 p->flags.start_zero = 1;
                             }
                             p->status = ECJP_PS_IN_VALUE;
-#if 0
-                            // Record key type
-                            key_token.type = ECJP_TYPE_NUMBER;
-                            // Add key token to the list
-                            if (key_list != NULL && p->open_brackets <= level)
-                            {
-                                if (ecjp_add_node_end(key_list, &key_token) != 0) {
-                                    res->err_pos = p->index;
-                                    ecjp_printf("%s - %d: Failed to add key token to the list\n", __FUNCTION__,__LINE__);
-                                    return ECJP_GENERIC_ERROR;
-                                } else {
-#ifdef DEBUG_VERBOSE
-                                    ecjp_printf("%s - %d: Added object key token to the list, key_list = %p\n", __FUNCTION__,__LINE__, (void *)*key_list);
-#endif  
-                                    res->num_keys++;
-                                }
-                            }
-                            // Reset key_token for future keys
-                            memset(&key_token, 0, sizeof(ecjp_key_token_t));
-#endif
                             ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
                         } else {
                             res->err_pos = p->index;
@@ -3119,14 +3069,14 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
                                         {
                                             ecjp_load_item(&token, tmp_buffer, p_buffer);
                                             // Add item token to the list
-                                            if (ecjp_add_node_end_2(item_list, &token) != 0) {
+                                            if (ecjp_add_node_item_end(item_list, &token) != 0) {
                                                 res->err_pos = p->index;
                                                 ecjp_printf("%s - %d: Failed to add item token to the list\n", __FUNCTION__,__LINE__);
                                                 return ECJP_GENERIC_ERROR;
                                             } else {
-    #ifdef DEBUG_VERBOSE
+#ifdef DEBUG_VERBOSE
                                                 ecjp_printf("%s - %d: Added item token to the list, item_list = %p\n", __FUNCTION__,__LINE__, (void *)*item_list);
-    #endif
+#endif
                                                 res->num_keys++;
                                             }
                                         }
@@ -3252,7 +3202,7 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
                             {
                                 ecjp_load_item(&token, tmp_buffer, p_buffer);
                                 // Add item token to the list
-                                if (ecjp_add_node_end_2(item_list, &token) != 0) {
+                                if (ecjp_add_node_item_end(item_list, &token) != 0) {
                                     res->err_pos = p->index;
                                     ecjp_printf("%s - %d: Failed to add item token to the list\n", __FUNCTION__,__LINE__);
                                     return ECJP_GENERIC_ERROR;
@@ -3297,7 +3247,7 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
                             {
                                 ecjp_load_item(&token, tmp_buffer, p_buffer);
                                 // Add item token to the list
-                                if (ecjp_add_node_end_2(item_list, &token) != 0) {
+                                if (ecjp_add_node_item_end(item_list, &token) != 0) {
                                     res->err_pos = p->index;
                                     ecjp_printf("%s - %d: Failed to add item token to the list\n", __FUNCTION__,__LINE__);
                                     return ECJP_GENERIC_ERROR;
@@ -3342,7 +3292,7 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
                             {
                                 ecjp_load_item(&token, tmp_buffer, p_buffer);
                                 // Add item token to the list
-                                if (ecjp_add_node_end_2(item_list, &token) != 0) {
+                                if (ecjp_add_node_item_end(item_list, &token) != 0) {
                                     res->err_pos = p->index;
                                     ecjp_printf("%s - %d: Failed to add item token to the list\n", __FUNCTION__,__LINE__);
                                     return ECJP_GENERIC_ERROR;
@@ -3416,22 +3366,8 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
 };
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+/* TO DO: work in progress */
+#if 0
 ecjp_return_code_t ecjp_read_key_val_string(const char *input, ecjp_key_elem_t **key_list, char *string)
 {
     return ECJP_NO_ERROR;
@@ -3446,5 +3382,6 @@ ecjp_return_code_t ecjp_read_key_val_bool(const char *input, ecjp_key_elem_t **k
 {
     return ECJP_NO_ERROR;
 }   
+#endif
 
 
