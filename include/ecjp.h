@@ -66,6 +66,7 @@ typedef enum {
     ECJP_TYPE_ARRAY,
     ECJP_TYPE_BOOL,
     ECJP_TYPE_NULL,
+    ECJP_TYPE_KEY_VALUE_PAIR,
     ECJP_TYPE_MAX_TYPES  
 } ecjp_value_type_t;
 
@@ -199,6 +200,8 @@ void ecjp_print_check_summary(ecjp_parser_data_t *p);
 #endif
 ecjp_return_code_t ecjp_internal_copy_array_element(char *buffer, unsigned int p_buffer, int index, int num_elements, ecjp_outdata_t *out);
 #endif
+
+extern char *ecjp_type[ECJP_TYPE_MAX_TYPES];
 
 // Function declarations (public API)
 ecjp_return_code_t ecjp_dummy(void);

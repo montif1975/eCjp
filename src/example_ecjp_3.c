@@ -89,7 +89,7 @@ int main(int argc, char *argv[])
                         } else {
                             while (item_list != NULL) {
                                 fprintf(stdout, "Item read successfully.\n");
-                                fprintf(stdout, "Type = %d, Value = %s\n", item_list->item.type, (char *)item_list->item.value);
+                                fprintf(stdout, "Type = %s, Value = %s\n", ecjp_type[item_list->item.type], (char *)item_list->item.value);
                                 item_list = item_list->next;
                             }
                             ecjp_free_item_list(&item_list);

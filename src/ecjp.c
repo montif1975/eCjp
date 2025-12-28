@@ -15,7 +15,8 @@ char *ecjp_type[ECJP_TYPE_MAX_TYPES] = {
     "OBJECT",
     "ARRAY",
     "BOOL",
-    "NULL"
+    "NULL",
+    "KEY_VALUE_PAIR"
 };
 
 // Internal function definitions
@@ -2417,7 +2418,9 @@ ecjp_return_code_t ecjp_store_tmp_item(char *buffer, int *p_buffer, char c)
     }
     buffer[*p_buffer] = c;
     (*p_buffer)++;
+#ifdef DEBUG_VERBOSE    
     ecjp_printf("%s - %d: Stored char '%c' in tmp buffer at position %d\n", __FUNCTION__,__LINE__, c, *p_buffer - 1);
+#endif
     return ECJP_NO_ERROR;
 }
 
@@ -2439,7 +2442,7 @@ void ecjp_load_item(ecjp_item_token_t *token, char *tmp_buffer, int p_buffer)
     token->value_size = p_buffer + 1;
     strncpy(token->value, tmp_buffer, p_buffer + 1);
 
-    ecjp_printf("%s - %d: Loaded item token of type %d, size %u, value: %s\n", __FUNCTION__,__LINE__, token->type, token->value_size, (char *)token->value);
+    ecjp_printf("%s - %d: Loaded item token of type %s, size %u, value: %s\n", __FUNCTION__,__LINE__, ecjp_type[token->type], token->value_size, (char *)token->value);
     return;
 }
 
@@ -2586,7 +2589,6 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
                         }   
                         p->status = ECJP_PS_IN_OBJECT;
                         res->struct_type = ECJP_ST_OBJ;
-                        token.type = ECJP_TYPE_OBJECT;
                         break;
 
                     case '[':
@@ -2598,7 +2600,6 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
                         }   
                         p->status = ECJP_PS_IN_ARRAY;
                         res->struct_type = ECJP_ST_ARRAY;
-                        token.type = ECJP_TYPE_ARRAY;
                         break;
 
                     default:
@@ -2628,6 +2629,9 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
                         }
                         p->status = ECJP_PS_IN_OBJECT;
                         // copy in tmp buffer
+                        if (p_buffer == 0) {
+                            token.type = ECJP_TYPE_OBJECT;
+                        }
                         ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
                         break;  
 
@@ -2671,6 +2675,9 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
                         p->status = ECJP_PS_IN_KEY;
                         p->flags.in_key = 1;
                         p->flags.trailing_comma = 0;
+                        if (p_buffer == 0) {
+                            token.type = ECJP_TYPE_KEY_VALUE_PAIR;
+                        }
                         ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
                         break;
                     
@@ -2703,6 +2710,9 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
                         if(p->flags.trailing_comma) {
                             p->flags.trailing_comma = 0;
                         }
+                        if (p_buffer == 0) {
+                            token.type = ECJP_TYPE_OBJECT;
+                        }
                         ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
                         break;
 
@@ -2732,7 +2742,10 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
                         p->status = ECJP_PS_IN_ARRAY;
                         if (p->flags.trailing_comma) {
                             p->flags.trailing_comma = 0;
-                        }   
+                        }
+                        if (p_buffer == 0) {
+                            token.type = ECJP_TYPE_ARRAY;
+                        }
                         ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
                         break;
 
@@ -2758,6 +2771,9 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
                         if (p->flags.trailing_comma) {
                             p->flags.trailing_comma = 0;
                         }
+                        if (p_buffer == 0) {
+                            token.type = ECJP_TYPE_STRING;
+                        }
                         ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
                         break;
 
@@ -2766,17 +2782,23 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
                             // valid value
                             p->status = ECJP_PS_WAIT_COMMA;
                             if (strncmp(&input[p->index], "true", 4) == 0) {
-                                token.type = ECJP_TYPE_BOOL;
+                                if (p_buffer == 0) {
+                                    token.type = ECJP_TYPE_BOOL;
+                                }
                                 for (int i = 0; i < 4; i++) {
                                     ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index + i]);
                                 }
                             } else if (strncmp(&input[p->index], "false", 5) == 0) {
-                                token.type = ECJP_TYPE_BOOL;
+                                if (p_buffer == 0) {
+                                    token.type = ECJP_TYPE_BOOL;
+                                }
                                 for (int i = 0; i < 5; i++) {
                                     ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index + i]);
                                 }
                             } else {
-                                token.type = ECJP_TYPE_NULL;
+                                if (p_buffer == 0) {
+                                    token.type = ECJP_TYPE_NULL;
+                                }
                                 for (int i = 0; i < 4; i++) {
                                     ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index + i]);
                                 }
@@ -2790,6 +2812,9 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
                         if ((input[p->index] >= '0' && input[p->index] <= '9') || input[p->index] == '-') {
                             // valid value start
                             p->flags.in_number = 1;
+                            if (p_buffer == 0) {
+                                token.type = ECJP_TYPE_NUMBER;
+                            }
                             if (input[p->index] == '0') {
                                 p->flags.start_zero = 1;
                             }
