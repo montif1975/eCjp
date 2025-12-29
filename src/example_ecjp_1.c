@@ -1,4 +1,5 @@
-#include "include/ecjp.h"
+//#include "include/ecjp.h"
+#include "ecjp.h"
 
 #include "sys/stat.h"
 #include <unistd.h>
@@ -24,55 +25,11 @@ void print_and_free_key_list(ecjp_key_elem_t **key_list)
     return;
 }
 
-void print_all_key_and_value(char *ptr, ecjp_key_elem_t *key_list)
-{
-    ecjp_key_elem_t *current = key_list;
-    ecjp_key_elem_t *next;
-    int len;
-    char buffer[ECJP_MAX_KEY_LEN];
-    char *ptr_tmp;
-    void *value;
-
-    value = malloc(256);
-    if (value == NULL) {
-        fprintf(stdout, "Memory allocation failed in %s\n", __FUNCTION__);
-        return;;
-    }
-
-    while (current != NULL) {
-        ptr_tmp = ptr;
-        if(current->key.type != ECJP_TYPE_UNDEFINED) {
-#if 0
-            fprintf(stdout, "Key at pos %u, length %u, type %u\n",
-                    current->key.start_pos,
-                    current->key.length,
-                    current->key.type);
-#endif
-            len = (current->key.length < ECJP_MAX_KEY_LEN) ? current->key.length : (ECJP_MAX_KEY_LEN - 1);
-            ptr_tmp += current->key.start_pos;
-            memset(buffer, 0, sizeof(buffer));
-            memset(value, 0, 256);
-            strncpy(buffer, ptr_tmp, len);
-            fprintf(stdout, "  Key: %s -- ", buffer);
-            // print value
-            if (ecjp_get_key_and_value(ptr, buffer, &key_list, value, 256) != ECJP_TYPE_UNDEFINED) {
-                fprintf(stdout, "Value: %s\n", (char *)value);
-            } else {    
-                fprintf(stdout, "Value: <not found>\n");
-            }   
-        }
-        next = current->next;
-        current = next;
-    }
-    free(value);    
-
-    return;
-}
-
 void print_all_keys(char *ptr, ecjp_key_elem_t *key_list)
 {
     ecjp_outdata_t retval;
     ecjp_return_code_t ret;
+    unsigned short int start = 0;
 
     memset(&retval,0,sizeof(retval));
     retval.value = malloc(ECJP_MAX_KEY_LEN);
@@ -80,16 +37,18 @@ void print_all_keys(char *ptr, ecjp_key_elem_t *key_list)
     ret = ECJP_NO_ERROR;
 
     while(ret != ECJP_NO_MORE_KEY) {
-        ret = ecjp_get_keys(ptr,NULL,&key_list,&retval);
+        ret = ecjp_get_key(ptr,NULL,&key_list,start,&retval);
         fprintf(stdout,
                 "Find key: %s [ret=%d type=%d last_pos=%d]\n",
                 (char *)retval.value,
                 retval.error_code,
                 retval.type,
                 retval.last_pos);
-        // reset retval but not the last position
+        start = retval.last_pos;
+        // reset retval
         retval.error_code = ECJP_NO_ERROR;
         retval.type = ECJP_TYPE_UNDEFINED;
+        retval.last_pos = 0;
         memset(retval.value,0,retval.value_size);
     }
     
@@ -104,6 +63,7 @@ void print_keys_and_value(char *ptr,ecjp_key_elem_t *key_list)
     ecjp_outdata_t out_read;
     ecjp_indata_t in;
     ecjp_return_code_t ret;
+    unsigned short int start = 0;
 
     memset(&out_get,0,sizeof(out_get));
     out_get.value = malloc(ECJP_MAX_KEY_LEN);
@@ -120,7 +80,7 @@ void print_keys_and_value(char *ptr,ecjp_key_elem_t *key_list)
     ret = ECJP_NO_ERROR;
 
     do {
-        ret = ecjp_get_keys(ptr,NULL,&key_list,&out_get);
+        ret = ecjp_get_key(ptr,NULL,&key_list,start,&out_get);
         if (ret != ECJP_NO_MORE_KEY) {
 #if 0            
             fprintf(stdout,
@@ -131,9 +91,10 @@ void print_keys_and_value(char *ptr,ecjp_key_elem_t *key_list)
                     out_get.last_pos);
 #endif
             // read value for this key
-            in.lenght = out_get.length;
+            in.length = out_get.length;
             in.type = out_get.type;
             in.pos = out_get.last_pos;
+            start = out_get.last_pos;
             strncpy(in.key,out_get.value,out_get.value_size);
             ecjp_read_key(ptr,&in,&out_read);
             if (out_read.error_code == ECJP_NO_ERROR || out_read.error_code == ECJP_NO_SPACE_IN_BUFFER_VALUE) {
@@ -142,9 +103,10 @@ void print_keys_and_value(char *ptr,ecjp_key_elem_t *key_list)
                         in.key,
                         (char *)out_read.value);
             }
-            // reset out_get but not the last position
+            // reset out_get 
             out_get.error_code = ECJP_NO_ERROR;
             out_get.type = ECJP_TYPE_UNDEFINED;
+            out_get.last_pos = 0;
             memset(out_get.value,0,out_get.value_size);
             // reset out_read
             out_read.error_code = ECJP_NO_ERROR;
@@ -159,38 +121,6 @@ void print_keys_and_value(char *ptr,ecjp_key_elem_t *key_list)
     
     free(out_get.value);
     free(out_read.value);
-
-    return;
-}
-
-void print_all_specific_key(char *ptr,ecjp_key_elem_t *key_list)
-{
-    ecjp_outdata_t retval;
-    ecjp_return_code_t ret;
-    char query[]="CFG";
-
-    memset(&retval,0,sizeof(retval));
-    retval.value = malloc(64);
-    retval.value_size = 64;
-    ret = ECJP_NO_ERROR;
-
-    do {
-        ret = ecjp_get_keys(ptr,query,&key_list,&retval);
-        if (ret != ECJP_NO_MORE_KEY) {
-            fprintf(stdout,
-                    "Find key: %s [ret=%d type=%d last_pos=%d]\n",
-                    query,
-                    retval.error_code,
-                    retval.type,
-                    retval.last_pos);
-            // reset retval but not the last position
-            retval.error_code = ECJP_NO_ERROR;
-            retval.type = ECJP_TYPE_UNDEFINED;
-            memset(retval.value,0,retval.value_size);
-        }
-    } while (ret != ECJP_NO_MORE_KEY);
-    
-    free(retval.value);
 
     return;
 }
@@ -261,8 +191,8 @@ int main(int argc, char *argv[])
                     ptr[read_bytes] = '\0';
                     fclose(f);
                     fprintf(stdout, "\nTesting JSON file (%s) of size %ld bytes:\n", argv[1], file_size);
-#if 0                    
-                    ret = ecjp_check_and_load(ptr,&key_list,&results);
+#if 1                    
+                    ret = ecjp_check_and_load(ptr,&key_list,&results,3);
 #else
                     ret = ecjp_check_syntax(ptr,&results);
 #endif
@@ -296,10 +226,8 @@ int main(int argc, char *argv[])
                                     ecjp_print_keys(ptr, key_list);
 #ifdef TEST_KEY_FIND
                                     // Test key finding
-//                                  print_all_key_and_value(ptr, key_list);
                                     print_keys_and_value(ptr,key_list);
 //                                  print_all_keys(ptr,key_list);
-//                                  print_all_specific_key(ptr,key_list);
 #endif
                                     print_and_free_key_list(&key_list);
                                 }    

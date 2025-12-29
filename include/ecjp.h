@@ -16,6 +16,15 @@ extern "C" {
 
 #include "ecjp_limit.h"
 
+#ifdef USE_BOOL_TYPE
+#include <stdbool.h>
+#else
+#include <stdint.h>
+typedef uint8_t bool;
+#define true                        1
+#define false                       0
+#endif
+
 #define DEBUG                       1
 //#define DEBUG_VERBOSE
 
@@ -63,6 +72,18 @@ typedef enum {
 } ecjp_return_code_t;
 
 typedef enum {
+    ECJP_TYPE_UNDEFINED = 0,
+    ECJP_TYPE_STRING,
+    ECJP_TYPE_NUMBER,
+    ECJP_TYPE_OBJECT,
+    ECJP_TYPE_ARRAY,
+    ECJP_TYPE_BOOL,
+    ECJP_TYPE_NULL,
+    ECJP_TYPE_KEY_VALUE_PAIR,
+    ECJP_TYPE_MAX_TYPES  
+} ecjp_value_type_t;
+
+typedef enum {
     ECJP_PS_START = 0,
     ECJP_PS_IN_OBJECT,
     ECJP_PS_IN_ARRAY,
@@ -89,6 +110,44 @@ typedef enum {
     ECJP_PA_END,
     ECJP_PA_MAX_STATUS
 } ecjp_parse_array_status_t;
+
+/*
+ * Structures and type definitions
+ * for keys list used to parse a Json-like input string
+ * This list doesn't store the key and its value, but only
+ * the position, length and type of each key found in the input string.
+ * To retrieve the value associated to a key, use ecjp_get_key() or ecjp_read_key()
+*/
+typedef struct key_token {
+    ECJP_TYPE_POS_KEY   start_pos;
+    ECJP_TYPE_LEN_KEY   length;
+    unsigned char       type;
+} ecjp_key_token_t;
+
+typedef struct key_elem {
+    ecjp_key_token_t key;
+    struct key_elem *next;
+} ecjp_key_elem_t;
+
+/*
+ * Structures and type definitions
+ * for items list used to store values read from a Json-like input string
+ * This list stores the type and value of each item read from the input string.
+ * No need to store position or length as the value is copied in the item structure.
+ * No need to scan again the input string to retrieve the value.
+ * This implementation use dynamic memory allocation for the value field and use much more memory than
+ * the keys list implementation.
+*/
+typedef struct item_token {
+    ecjp_value_type_t   type;
+    void                *value;
+    unsigned int        value_size;
+} ecjp_item_token_t;
+
+typedef struct item_elem {
+    ecjp_item_token_t item;
+    struct item_elem *next;
+} ecjp_item_elem_t;
 
 typedef union  {
         unsigned char all;
@@ -149,7 +208,7 @@ typedef struct ecjp_indata {
     char                key[ECJP_MAX_KEY_LEN];
     ecjp_value_type_t   type;
     ECJP_TYPE_POS_KEY   pos;
-    ECJP_TYPE_LEN_KEY   lenght;
+    ECJP_TYPE_LEN_KEY   length;
 } ecjp_indata_t;
 
 #if 0
@@ -166,6 +225,8 @@ void ecjp_print_check_summary(ecjp_parser_data_t *p);
 ecjp_return_code_t ecjp_internal_copy_array_element(char *buffer, unsigned int p_buffer, int index, int num_elements, ecjp_outdata_t *out);
 #endif
 
+extern char *ecjp_type[ECJP_TYPE_MAX_TYPES];
+
 // Function declarations (public API)
 ecjp_return_code_t ecjp_dummy(void);
 ecjp_return_code_t ecjp_get_version(int *major, int *minor, int *patch);
@@ -173,14 +234,17 @@ ecjp_return_code_t ecjp_get_version_string(char *version_string, size_t max_leng
 ecjp_return_code_t ecjp_show_error(const char *input, int err_pos);
 ecjp_return_code_t ecjp_print_keys(const char *input, ecjp_key_elem_t *key_list);
 ecjp_return_code_t ecjp_free_key_list(ecjp_key_elem_t **key_list);
-ecjp_value_type_t ecjp_get_key(const char input[], char *key, ecjp_key_elem_t **key_list);
-ecjp_return_code_t ecjp_get_keys(const char input[],char *key,ecjp_key_elem_t **key_list,ecjp_outdata_t *out);
+ecjp_return_code_t ecjp_get_key(const char input[],char *key,ecjp_key_elem_t **key_list,ECJP_TYPE_POS_KEY start,ecjp_outdata_t *out);
 ecjp_return_code_t ecjp_read_key(const char input[],ecjp_indata_t *in,ecjp_outdata_t *out);
 ecjp_return_code_t ecjp_read_array_element(const char input[],int index,ecjp_outdata_t *out);
-ecjp_value_type_t ecjp_get_key_and_value(const char input[], char *key, ecjp_key_elem_t **key_list, void *value, size_t value_size);
-ecjp_return_code_t ecjp_check_and_load(const char *input, ecjp_key_elem_t **key_list, ecjp_check_result_t *res);
+ecjp_return_code_t ecjp_get_keys_and_value(char *ptr,ecjp_key_elem_t *key_list);
+ecjp_return_code_t ecjp_check_and_load(const char *input, ecjp_key_elem_t **key_list, ecjp_check_result_t *res, unsigned short int level);
 ecjp_return_code_t ecjp_check_syntax(const char *input, ecjp_check_result_t *res);
-ecjp_return_code_t ecjp_load(const char *input, ecjp_key_elem_t **key_list, ecjp_check_result_t *res);
+ecjp_return_code_t ecjp_load(const char *input, ecjp_key_elem_t **key_list, ecjp_check_result_t *res, unsigned short int level);
+
+// alternative functions using items list
+ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **item_list, ecjp_check_result_t *res);
+ecjp_return_code_t ecjp_free_item_list(ecjp_item_elem_t **item_list);
 
 #ifdef __cplusplus
 }
