@@ -20,7 +20,6 @@ int main(int argc, char *argv[])
     struct stat strstat;
     ecjp_item_elem_t *item_list = NULL;
 
-    int err_pos = -1;
     results.err_pos = -1;
     results.num_keys = 0;
     results.struct_type = ECJP_ST_NULL;
