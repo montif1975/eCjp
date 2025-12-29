@@ -44,7 +44,6 @@ int main(int argc, char *argv[])
     struct stat strstat;
     ecjp_key_elem_t *key_list = NULL;
     ecjp_outdata_t out;
-    int index = 0;
 
     results.err_pos = -1;
     results.num_keys = 0;

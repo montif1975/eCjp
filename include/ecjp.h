@@ -29,7 +29,7 @@ typedef uint8_t bool;
 //#define DEBUG_VERBOSE
 
 #define ECJP_VERSION_MAJOR           0
-#define ECJP_VERSION_MINOR           2
+#define ECJP_VERSION_MINOR           3
 #define ECJP_VERSION_PATCH           0
 
 #define ECJP_ARRAY_NO_INDEX         -1
@@ -38,17 +38,6 @@ typedef enum {
     ECJP_BOOL_FALSE,
     ECJP_BOOL_TRUE           
 } ecjp_bool_t;
-
-typedef struct key_token {
-    ECJP_TYPE_POS_KEY   start_pos;
-    ECJP_TYPE_LEN_KEY   length;
-    unsigned char       type;
-} ecjp_key_token_t;
-
-typedef struct key_elem {
-    ecjp_key_token_t key;
-    struct key_elem *next;
-} ecjp_key_elem_t;
 
 typedef enum {
     ECJP_ST_NULL,
@@ -183,17 +172,6 @@ typedef struct ecjp_parser_data {
     ecjp_parse_stack_item_t parse_stack;
     ecjp_flags_t flags;
 } ecjp_parser_data_t;
-
-typedef enum {
-    ECJP_TYPE_UNDEFINED = 0,
-    ECJP_TYPE_STRING,
-    ECJP_TYPE_NUMBER,
-    ECJP_TYPE_OBJECT,
-    ECJP_TYPE_ARRAY,
-    ECJP_TYPE_BOOL,
-    ECJP_TYPE_NULL,
-    ECJP_TYPE_MAX_TYPES  
-} ecjp_value_type_t;
 
 typedef struct ecjp_outdata {
     ecjp_return_code_t  error_code;
