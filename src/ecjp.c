@@ -3463,7 +3463,7 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
  *  ECJP_NO_ERROR on success
  *  ECJP_NULL_POINTER if any input pointer is NULL
  *  ECJP_SYNTAX_ERROR if the item is not a key-value pair
- * 
+ *  ECJP_NO_SPACE_IN_BUFFER_VALUE if the key or value exceeds maximum length of the buffers
 */
 ecjp_return_code_t ecjp_split_key_and_value(ecjp_item_elem_t *item_list, char *key, char *value, ecjp_bool_t leave_quotes)
 {
@@ -3476,7 +3476,7 @@ ecjp_return_code_t ecjp_split_key_and_value(ecjp_item_elem_t *item_list, char *k
     if (item_list->item.type != ECJP_TYPE_KEY_VALUE_PAIR) {
         return ECJP_SYNTAX_ERROR;
     }
-    for (i = 0; i < item_list->item.value_size; i++) {
+    for (i = 0; i < item_list->item.value_size && i < ECJP_MAX_KEY_LEN; i++) {
         if (((char *)item_list->item.value)[i] == ':') {
             break;
         }
@@ -3492,9 +3492,12 @@ ecjp_return_code_t ecjp_split_key_and_value(ecjp_item_elem_t *item_list, char *k
             }
         }
     }
+    if (i == ECJP_MAX_KEY_LEN) {
+        return ECJP_NO_SPACE_IN_BUFFER_VALUE;
+    }
     (*key) = '\0';
 
-    for (j = 0; i < item_list->item.value_size; i++, j++) {
+    for (j = 0; i < item_list->item.value_size && j < ECJP_MAX_KEY_VALUE_LEN; i++, j++) {
         if (((char *)item_list->item.value)[i] != ':') {
             if (((char *)item_list->item.value)[i] != '"') {
                 (*value) = ((char *)item_list->item.value)[i];
@@ -3506,6 +3509,9 @@ ecjp_return_code_t ecjp_split_key_and_value(ecjp_item_elem_t *item_list, char *k
                 }
             }
         }
+    }
+    if (j == ECJP_MAX_KEY_VALUE_LEN) {
+        return ECJP_NO_SPACE_IN_BUFFER_VALUE;
     }
     (*value) = '\0';
 
