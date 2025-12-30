@@ -78,8 +78,8 @@ void print_keys_and_value(char *ptr,ecjp_key_elem_t *key_list)
     memset(out_get.value,0,out_get.value_size);
 
     memset(&out_read,0,sizeof(out_read));
-    out_read.value = malloc(ECJP_MAX_KEY_LEN);
-    out_read.value_size = ECJP_MAX_KEY_LEN;
+    out_read.value = malloc(ECJP_MAX_KEY_VALUE_LEN);
+    out_read.value_size = ECJP_MAX_KEY_VALUE_LEN;
     memset(out_read.value,0,out_read.value_size);
 
     memset(&in,0,sizeof(in));

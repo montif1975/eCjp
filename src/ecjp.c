@@ -813,13 +813,13 @@ ecjp_return_code_t ecjp_get_keys_and_value(char *ptr,ecjp_key_elem_t *key_list)
     memset(out_get.value,0,out_get.value_size);
 
     memset(&out_read,0,sizeof(out_read));
-    out_read.value = malloc(ECJP_MAX_KEY_LEN);
-    out_read.value_size = ECJP_MAX_KEY_LEN;
+    out_read.value = malloc(ECJP_MAX_KEY_VALUE_LEN);
+    out_read.value_size = ECJP_MAX_KEY_VALUE_LEN;
     memset(out_read.value,0,out_read.value_size);
 
     memset(&out_array,0,sizeof(out_array));
-    out_array.value = malloc(ECJP_MAX_KEY_LEN);
-    out_array.value_size = ECJP_MAX_KEY_LEN;
+    out_array.value = malloc(ECJP_MAX_ARRAY_ELEM_LEN);
+    out_array.value_size = ECJP_MAX_ARRAY_ELEM_LEN;
     memset(out_array.value,0,out_array.value_size);
 
     memset(&in,0,sizeof(in));
@@ -3449,6 +3449,68 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
 
     return ECJP_NO_ERROR;
 };
+
+/*
+ * Function: ecjp_split_key_and_value()
+ * --------------------
+ * Splits a key-value pair item into separate key and value strings.
+ * Parameters:
+ *      item_list: Pointer to the ecjp_item_elem_t containing the key-value pair.
+ *      key: Pointer to a char array where the extracted key will be stored.
+ *      value: Pointer to a char array where the extracted value will be stored.
+ *      leave_quotes: Boolean flag indicating whether to retain quotes around the key.
+ * Returns:
+ *  ECJP_NO_ERROR on success
+ *  ECJP_NULL_POINTER if any input pointer is NULL
+ *  ECJP_SYNTAX_ERROR if the item is not a key-value pair
+ * 
+*/
+ecjp_return_code_t ecjp_split_key_and_value(ecjp_item_elem_t *item_list, char *key, char *value, ecjp_bool_t leave_quotes)
+{
+    int i, j;
+
+    if (item_list == NULL || key == NULL || value == NULL) {
+        return ECJP_NULL_POINTER;
+    }
+
+    if (item_list->item.type != ECJP_TYPE_KEY_VALUE_PAIR) {
+        return ECJP_SYNTAX_ERROR;
+    }
+    for (i = 0; i < item_list->item.value_size; i++) {
+        if (((char *)item_list->item.value)[i] == ':') {
+            break;
+        }
+        else {
+            if (((char *)item_list->item.value)[i] != '"') {
+                (*key) = ((char *)item_list->item.value)[i];
+                key++;
+            } else {
+                if (leave_quotes) {
+                    (*key) = ((char *)item_list->item.value)[i];
+                    key++;
+                }
+            }
+        }
+    }
+    (*key) = '\0';
+
+    for (j = 0; i < item_list->item.value_size; i++, j++) {
+        if (((char *)item_list->item.value)[i] != ':') {
+            if (((char *)item_list->item.value)[i] != '"') {
+                (*value) = ((char *)item_list->item.value)[i];
+                value++;
+            } else {
+                if (leave_quotes) {
+                    (*value) = ((char *)item_list->item.value)[i];
+                    value++;
+                }
+            }
+        }
+    }
+    (*value) = '\0';
+
+    return ECJP_NO_ERROR;
+}
 
 
 /* TO DO: work in progress */

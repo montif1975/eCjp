@@ -223,6 +223,7 @@ ecjp_return_code_t ecjp_free_item_list(ecjp_item_elem_t **item_list);
 ecjp_return_code_t ecjp_check_syntax_2(const char *input, ecjp_check_result_t *res);
 ecjp_return_code_t ecjp_load_2(const char *input, ecjp_item_elem_t **item_list, ecjp_check_result_t *res);
 ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **item_list, ecjp_check_result_t *res);
+ecjp_return_code_t ecjp_split_key_and_value(ecjp_item_elem_t *item_list, char *key, char *value, ecjp_bool_t leave_quotes);
 
 #ifdef __cplusplus
 }
