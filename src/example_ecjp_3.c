@@ -4,11 +4,19 @@
 #include "sys/stat.h"
 #include <unistd.h>
 
+#ifdef ECJP_RUN_ON_PC
+    #define ecjp_fprintf(format, ...)    fprintf(stdout, format, __VA_ARGS__)
+    #define ecjp_fprint(format)          fprintf(stdout, format)
+#else
+    #define ecjp_fprintf(format, ...)
+    #define ecjp_fprint(format)
+#endif
+
 #define TEST_KEY_FIND
 
 void usage(char *prog_name)
 {
-    fprintf(stderr, "Usage: %s [filename]\n", prog_name);
+    ecjp_fprintf("Usage: %s [filename]\n", prog_name);
 }
 
 int main(int argc, char *argv[])
@@ -27,10 +35,10 @@ int main(int argc, char *argv[])
     major = minor = patch = 0;
     ret = ecjp_get_version(&major, &minor, &patch);
     if (ret != ECJP_NO_ERROR) {
-        fprintf(stderr, "ecjp_get_version() failed with error code: %d\n", ret);
+        ecjp_fprintf("ecjp_get_version() failed with error code: %d\n", ret);
     }
     else {
-        fprintf(stdout, "\nUsing eCjp version: %d.%d.%d\n", major, minor, patch);
+        ecjp_fprintf("\nUsing eCjp version: %d.%d.%d\n", major, minor, patch);
     }
 
     // check arguments and open test files
@@ -39,7 +47,7 @@ int main(int argc, char *argv[])
         return -1;
     }
     if(argc == 2) {
-        fprintf(stdout, "\nUsing input file: %s\n", argv[1]);
+        ecjp_fprintf("\nUsing input file: %s\n", argv[1]);
         memset(&strstat, 0, sizeof(struct stat));
         ret = stat(argv[1], &strstat);
         if (ret == 0)
@@ -52,14 +60,14 @@ int main(int argc, char *argv[])
                     size_t read_bytes = fread(ptr, 1, file_size, f);
                     ptr[read_bytes] = '\0';
                     fclose(f);
-                    fprintf(stdout, "\nUsing JSON file (%s) of size %ld bytes:\n", argv[1], file_size);
-                    ret = ecjp_check_syntax(ptr,&results);
+                    ecjp_fprintf("\nUsing JSON file (%s) of size %ld bytes:\n", argv[1], file_size);
+                    ret = ecjp_check_syntax_2(ptr,&results);
                     if (ret != ECJP_NO_ERROR) {
-                        fprintf(stderr, "ecjp_check_syntax() on JSON file: FAILED with error code: %d\n", ret);
+                        ecjp_fprintf("ecjp_check_syntax() on JSON file: FAILED with error code: %d\n", ret);
                         if (results.err_pos >= 0) {
-                            fprintf(stderr, "ecjp_check_syntax(): Error position: %d\n", results.err_pos);
+                            ecjp_fprintf("ecjp_check_syntax(): Error position: %d\n", results.err_pos);
                             if(results.err_pos >= 1024) {
-                                fprintf(stderr, "Error position is beyond 1024 characters, showing context around error:\n");
+                                ecjp_fprint("Error position is beyond 1024 characters, showing context around error:\n");
                                 int start_pos = results.err_pos - 512;
                                 if (start_pos < 0) start_pos = 0;
                                 int end_pos = results.err_pos + 512;
@@ -77,18 +85,18 @@ int main(int argc, char *argv[])
                         return -1;
                     }
                     else {
-                        fprintf(stdout, "ecjp_check_syntax() on JSON file: SUCCEEDED.\n");
-                        ret = ecjp_check_and_load_2(ptr,&item_list,&results);
+                        ecjp_fprint("ecjp_check_syntax() on JSON file: SUCCEEDED.\n");
+                        ret = ecjp_load_2(ptr,&item_list,&results);
                         if (ret != ECJP_NO_ERROR) {
-                            fprintf(stderr, "ecjp_check_and_load_2() on JSON file: FAILED with error code: %d\n", ret);
+                            ecjp_fprintf("ecjp_load_2() on JSON file: FAILED with error code: %d\n", ret);
                             free(ptr);
                             ptr = NULL;
                             ecjp_free_item_list(&item_list);
                             return -1;
                         } else {
                             while (item_list != NULL) {
-                                fprintf(stdout, "Item read successfully.\n");
-                                fprintf(stdout, "Type = %s, Value = %s\n", ecjp_type[item_list->item.type], (char *)item_list->item.value);
+                                ecjp_fprint("Item read successfully.\n");
+                                ecjp_fprintf("Type = %s, Value = %s\n", ecjp_type[item_list->item.type], (char *)item_list->item.value);
                                 item_list = item_list->next;
                             }
                             ecjp_free_item_list(&item_list);
@@ -97,17 +105,17 @@ int main(int argc, char *argv[])
                     free(ptr);
                     ptr = NULL;
                 } else {
-                    fprintf(stderr, "Failed to open file %s\n", argv[1]);
+                    ecjp_fprintf("Failed to open file %s\n", argv[1]);
                     free(ptr);
                     ptr = NULL;
                     ret = -1;
                 }
             } else {
-                fprintf(stderr, "Memory allocation failed for JSON file\n");
+                ecjp_fprint("Memory allocation failed for JSON file\n");
                 ret = -1;
             } 
         } else {
-            fprintf(stderr, "stat() failed for file %s\n", argv[1]);
+            ecjp_fprintf("stat() failed for file %s\n", argv[1]);
             ret = -1;
         }
     }

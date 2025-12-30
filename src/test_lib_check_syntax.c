@@ -3,9 +3,17 @@
 #include "sys/stat.h"
 #include <unistd.h>
 
+#ifdef ECJP_RUN_ON_PC
+    #define ecjp_fprintf(format, ...)    fprintf(stdout, format, __VA_ARGS__)
+    #define ecjp_fprint(format)          fprintf(stdout, format)
+#else
+    #define ecjp_fprintf(format, ...)
+    #define ecjp_fprint(format)
+#endif
+
 void usage(char *prog_name)
 {
-    fprintf(stderr, "Usage: %s [filename]\n", prog_name);
+    ecjp_fprintf("Usage: %s [filename]\n", prog_name);
 }
 
 int main(int argc, char *argv[])
@@ -27,7 +35,7 @@ int main(int argc, char *argv[])
         return -1;
     }
     if(argc == 2) {
-        fprintf(stdout, "\nTesting input file: %s\n", argv[1]);
+        ecjp_fprintf("\nTesting input file: %s\n", argv[1]);
         memset(&strstat, 0, sizeof(struct stat));
         ret = stat(argv[1], &strstat);
         if (ret == 0)
@@ -40,14 +48,14 @@ int main(int argc, char *argv[])
                     size_t read_bytes = fread(ptr, 1, file_size, f);
                     ptr[read_bytes] = '\0';
                     fclose(f);
-                    fprintf(stdout, "\nTesting JSON file (%s) of size %ld bytes:\n", argv[1], file_size);
+                    ecjp_fprintf("\nTesting JSON file (%s) of size %ld bytes:\n", argv[1], file_size);
                     ret = ecjp_check_syntax(ptr,&results);
                     if (ret != ECJP_NO_ERROR) {
-                        fprintf(stderr, "ecjp_check_syntax() on JSON file: FAILED with error code: %d\n", ret);
+                        ecjp_fprintf("ecjp_check_syntax() on JSON file: FAILED with error code: %d\n", ret);
                         if (results.err_pos >= 0) {
-                            fprintf(stderr, "ecjp_check_syntax(): Error position: %d\n", results.err_pos);
+                            ecjp_fprintf("ecjp_check_syntax(): Error position: %d\n", results.err_pos);
                             if(results.err_pos >= 1024) {
-                                fprintf(stderr, "Error position is beyond 1024 characters, showing context around error:\n");
+                                ecjp_fprint("Error position is beyond 1024 characters, showing context around error:\n");
                                 int start_pos = results.err_pos - 512;
                                 if (start_pos < 0) start_pos = 0;
                                 int end_pos = results.err_pos + 512;
@@ -65,25 +73,25 @@ int main(int argc, char *argv[])
                         return -1;
                     }
                     else {
-                        fprintf(stdout, "ecjp_check_syntax() on JSON file: SUCCEEDED.\n");
-                        fprintf(stdout, "ecjp_check_syntax() - num. keys found = %d, struct type = %d.\n",results.num_keys,results.struct_type);
+                        ecjp_fprint("ecjp_check_syntax() on JSON file: SUCCEEDED.\n");
+                        ecjp_fprintf("ecjp_check_syntax() - num. keys found = %d, struct type = %d.\n",results.num_keys,results.struct_type);
                     }
                     free(ptr);
                     ptr = NULL;
                 }
                 else {
-                    fprintf(stderr, "Failed to open file %s\n", argv[1]);
+                    ecjp_fprintf("Failed to open file %s\n", argv[1]);
                     free(ptr);
                     ptr = NULL;
                     return -1;
                 }
             }
             else {
-                fprintf(stderr, "Memory allocation failed for JSON file\n");
+                ecjp_fprint("Memory allocation failed for JSON file\n");
                 return -1;
             }   
         } else {
-            fprintf(stderr, "stat() failed for file %s\n", argv[1]);
+            ecjp_fprintf("stat() failed for file %s\n", argv[1]);
             return -1;
         }
     }

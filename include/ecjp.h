@@ -219,8 +219,10 @@ ecjp_return_code_t ecjp_check_syntax(const char *input, ecjp_check_result_t *res
 ecjp_return_code_t ecjp_load(const char *input, ecjp_key_elem_t **key_list, ecjp_check_result_t *res, unsigned short int level);
 
 // alternative functions using items list
-ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **item_list, ecjp_check_result_t *res);
 ecjp_return_code_t ecjp_free_item_list(ecjp_item_elem_t **item_list);
+ecjp_return_code_t ecjp_check_syntax_2(const char *input, ecjp_check_result_t *res);
+ecjp_return_code_t ecjp_load_2(const char *input, ecjp_item_elem_t **item_list, ecjp_check_result_t *res);
+ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **item_list, ecjp_check_result_t *res);
 
 #ifdef __cplusplus
 }

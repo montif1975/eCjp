@@ -1,12 +1,28 @@
 #include "ecjp.h"
 
-#if DEBUG
-#define ecjp_printf(format, ...)    printf(format, __VA_ARGS__)
-#define ecjp_print(format)          printf(format)
+#ifdef ECJP_RUN_ON_PC
+    #if DEBUG
+        #define ecjp_printf(format, ...)    printf(format, __VA_ARGS__)
+        #define ecjp_print(format)          printf(format)
+    #else
+        #define ecjp_printf(format, ...)
+        #define ecjp_print(format)
+    #endif
 #else
-#define ecjp_printf(format, ...)
-#define ecjp_print(format)
-#endif
+    #ifdef ECJP_RUN_ON_MCU
+        #define ecjp_printf(format, ...)
+        #define ecjp_print(format)
+    #else
+        #if DEBUG
+            #define ecjp_printf(format, ...)    printf(format, __VA_ARGS__)
+            #define ecjp_print(format)          printf(format)
+        #else
+            #define ecjp_printf(format, ...)
+            #define ecjp_print(format)
+        #endif
+    #endif // ECJP_RUN_ON_MCU
+#endif // ECJP_RUN_ON_PC
+
 
 char *ecjp_type[ECJP_TYPE_MAX_TYPES] = {
     "UNDEFINED",
@@ -436,7 +452,7 @@ ecjp_return_code_t ecjp_show_error(const char *input, int err_pos)
         - ECJP_NO_ERROR on success.
         - ECJP_NULL_POINTER if input or key_list is NULL.
 */
-ecjp_return_code_t ecjp_print_keys(const char *input, ecjp_key_elem_t *key_list)
+ecjp_return_code_t  ecjp_print_keys(const char *input, ecjp_key_elem_t *key_list)
 {
     ecjp_key_elem_t *current = key_list;
     int key_index = 0;
@@ -557,7 +573,7 @@ ecjp_return_code_t ecjp_get_key(const char input[],char *key,ecjp_key_elem_t **k
             out->type = current->key.type;
             out->last_pos = current->key.start_pos;
             out->length = current->key.length;
-            if ((out->value != NULL) && (out->value_size >= len)) {
+            if ((out->value != NULL) && (len <= out->value_size)) {
                 strncpy(out->value,buffer,len);
             } else {
                 out->error_code = ECJP_NO_SPACE_IN_BUFFER_VALUE;
@@ -590,7 +606,7 @@ ecjp_return_code_t ecjp_read_key(const char input[],ecjp_indata_t *in,ecjp_outda
 {
     ecjp_return_code_t ret = ECJP_NO_ERROR;
     char *ptr;
-    char *ptr_value; // pointer to value start
+    char *ptr_value = NULL; // pointer to value start
     unsigned int vsize;
     unsigned short int open_brackets;
 
@@ -742,6 +758,13 @@ ecjp_return_code_t ecjp_read_key(const char input[],ecjp_indata_t *in,ecjp_outda
             out->type = ECJP_TYPE_UNDEFINED;
             out->error_code = ECJP_EMPTY_STRING;
             break;
+    }
+    // sanity check
+    if (ptr_value == NULL) {
+        ecjp_printf("%s - %d: Internal error, value pointer is NULL\n", __FUNCTION__,__LINE__);
+        out->error_code = ECJP_GENERIC_ERROR;
+        ret = out->error_code;
+        return ret;
     }
     if (out->value_size <= vsize) {
         vsize = out->value_size - 1; // leave space for null terminator
@@ -2398,6 +2421,43 @@ In this implementation, we parse the input string and extract item tokens (value
 We store these item tokens in a linked list passed as a parameter.
 This implementation is useful when the focus is on the values rather than the keys but use much more memory.
 */
+
+/*
+    Function: ecjp_check_syntax_2
+    This function call ecjp_check_and_load_2() without pointer to store the items to perform only syntax checking.
+    Parameters:
+    - input: The JSON-like input string to be checked and loaded.
+    - res: Pointer to a structure to store the result of the check, including any error position.
+    Returns:
+    - ECJP_NO_ERROR if the input string is valid.
+    - ECJP_NULL_POINTER if any input pointer is NULL.
+    - ECJP_EMPTY_STRING if the input string is empty.
+    - ECJP_SYNTAX_ERROR if there is a syntax error in the input string.
+*/
+ecjp_return_code_t ecjp_check_syntax_2(const char *input, ecjp_check_result_t *res)
+{
+    return ecjp_check_and_load_2(input, NULL, res);
+}
+
+/*
+    Function: ecjp_load_2
+    This function call ecjp_check_and_load_2() with pointer to store the items to perform syntax checking
+    and store all items found in the input string at nested level less than or equal to the specified level.
+    Parameters:
+    - input: The JSON-like input string to be checked and loaded.
+    - item_list: Pointer to a list of item elements loaded with the items found in the input string.
+    - res: Pointer to a structure to store the result of the check, including any error position.
+    - level: The level of checking to be performed; used to manage keys inside nested structures.
+    Returns:
+    - ECJP_NO_ERROR if the input string is valid.
+    - ECJP_NULL_POINTER if any input pointer is NULL.
+    - ECJP_EMPTY_STRING if the input string is empty.
+    - ECJP_SYNTAX_ERROR if there is a syntax error in the input string.
+*/
+ecjp_return_code_t ecjp_load_2(const char *input, ecjp_item_elem_t **item_list, ecjp_check_result_t *res)
+{    
+    return ecjp_check_and_load_2(input, item_list, res);
+}
 
 /*
  *  Function: ecjp_store_tmp_item
