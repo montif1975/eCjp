@@ -57,9 +57,9 @@ int main(int argc, char *argv[])
     char *ptr;
     struct stat strstat;
     ecjp_item_elem_t *item_list = NULL;
-    char key[ECJP_MAX_KEY_LEN];
-    char value[ECJP_MAX_KEY_VALUE_LEN];
     ecjp_outdata_t out;
+    int index = 0;
+    char search_key[] = "KEY_1";
 
     results.err_pos = -1;
     results.num_keys = 0;
@@ -123,7 +123,7 @@ int main(int argc, char *argv[])
                         results.err_pos = -1;
                         results.num_keys = 0;
                         results.struct_type = ECJP_ST_NULL;
-                        results.memory_used = 0;
+                        results.memory_used = 0;                        
                         ret = ecjp_load_2(ptr,&item_list,&results);
                         if (ret != ECJP_NO_ERROR) {
                             ecjp_fprintf("ecjp_load_2() on JSON file: FAILED with error code: %d\n", ret);
@@ -132,66 +132,22 @@ int main(int argc, char *argv[])
                             ecjp_free_item_list(&item_list);
                             return -1;
                         } else {
-#if 1
-                            int index = 0;
                             memset(&out, 0, sizeof(ecjp_outdata_t));
                             out.value = malloc(ECJP_MAX_ITEM_LEN);
                             do {
                                 out.value_size = ECJP_MAX_ITEM_LEN;
                                 memset(out.value, 0, ECJP_MAX_ITEM_LEN);
-                                if(ecjp_read_element(item_list, index, &out) == ECJP_NO_ERROR) {
-                                    if (out.type == ECJP_TYPE_KEY_VALUE_PAIR) {
-                                        // parse key-value pair
-                                        memset(key, 0, sizeof(key));
-                                        memset(value, 0, sizeof(value));
-                                        sscanf((char *)out.value, "%[^:]:%[^\n]", key, value);
-                                        ecjp_fprintf("  Key = '%s', Value = '%s'\n", key, value);
-                                    }
+                                out.length = 0;
+                                out.last_pos = 0;
+
+                                if(ecjp_read_key_2(item_list, search_key, index, &out) == ECJP_NO_ERROR) {
+                                    ecjp_fprintf("  Key = '%s', Value = '%s'\n", search_key, (char *)out.value);
                                 }
                                 else {
                                     break;
                                 }
-                                index++;
+                                index = out.last_pos + 1;
                             } while (1);
-                            // random access example
-                            out.value_size = ECJP_MAX_ITEM_LEN;
-                            memset(out.value, 0, ECJP_MAX_ITEM_LEN);
-                            ecjp_read_element(item_list, 0, &out);
-
-                            out.value_size = ECJP_MAX_ITEM_LEN;
-                            memset(out.value, 0, ECJP_MAX_ITEM_LEN);
-                            ecjp_read_element(item_list, 1, &out);
-
-                            out.value_size = ECJP_MAX_ITEM_LEN;
-                            memset(out.value, 0, ECJP_MAX_ITEM_LEN);
-                            ecjp_read_element(item_list, 2, &out);
-
-                            out.value_size = ECJP_MAX_ITEM_LEN;
-                            memset(out.value, 0, ECJP_MAX_ITEM_LEN);
-                            ecjp_read_element(item_list, --index, &out);
-#else
-                            while (item_list != NULL) {
-                                ecjp_fprint("Item read successfully.\n");
-                                ecjp_fprintf("Type = %s, Value = %s\n", ecjp_type[item_list->item.type], (char *)item_list->item.value);
-                                if (item_list->item.type == ECJP_TYPE_KEY_VALUE_PAIR) {
-                                    // parse key-value pair
-                                    memset(key, 0, sizeof(key));
-                                    memset(value, 0, sizeof(value));
-#if 0                                    
-                                    sscanf((char *)item_list->item.value, "%[^:]:%[^\n]", key, value);
-                                    ecjp_fprintf("  Key = '%s', Value = '%s'\n", key, value);
-#else
-                                    // for MCUs without sscanf support, use library function
-                                    if (ecjp_split_key_and_value(item_list, key, value, ECJP_BOOL_TRUE) != ECJP_NO_ERROR) {
-                                        ecjp_fprint("  Failed to split key-value pair.\n");
-                                    } else  {
-                                        ecjp_fprintf("  Key = '%s', Value = '%s'\n", key, value);
-                                    }
-#endif
-                                }   
-                                item_list = item_list->next;
-                            }
-#endif
                             ecjp_free_item_list(&item_list);
                         }
                     }

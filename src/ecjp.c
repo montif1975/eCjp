@@ -1,3 +1,34 @@
+/*
+BSD 3-Clause License
+
+Copyright (c) 2025, Alfredo Montini
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+1. Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+2. Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+3. Neither the name of the copyright holder nor the names of its
+   contributors may be used to endorse or promote products derived from
+   this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+
 #include "ecjp.h"
 
 #ifdef ECJP_RUN_ON_PC
@@ -573,8 +604,14 @@ ecjp_return_code_t ecjp_get_key(const char input[],char *key,ecjp_key_elem_t **k
             out->type = current->key.type;
             out->last_pos = current->key.start_pos;
             out->length = current->key.length;
-            if ((out->value != NULL) && (len <= out->value_size)) {
-                strncpy(out->value,buffer,len);
+            if ((out->value != NULL) && (out->value_size > 0)) {
+                char *dst = (char *)out->value;
+                size_t max = out->value_size - 1;
+                if (len > max) {
+                    len = max;
+                }
+                memcpy(dst, buffer, len);
+                dst[len] = '\0'; // null terminate
             } else {
                 out->error_code = ECJP_NO_SPACE_IN_BUFFER_VALUE;
             }
@@ -2485,25 +2522,35 @@ ecjp_return_code_t ecjp_store_tmp_item(char *buffer, int *p_buffer, char c)
 }
 
 /*
- *  Function: ecjp_load_item
+ *  Function: ecjp_load_item()
     This function load an item token from the temporary buffer.
     Parameters:
     - token: Pointer to the item token structure to be loaded.
     - tmp_buffer: The temporary buffer containing the item value.
     - p_buffer: The size of the item value in the buffer.
+    Returns:
+    - The length of the loaded item token value.
+    - 0 if there is a memory allocation error.
 */
-void ecjp_load_item(ecjp_item_token_t *token, char *tmp_buffer, int p_buffer)
+int ecjp_load_item(ecjp_item_token_t *token, char *tmp_buffer, int p_buffer)
 {
+    int len = (p_buffer + 1);
+
     // allocate memory for token value, copy tmp_buffer to token value
     // in tmp_buffer there are no more than ECJP_MAX_ITEM_LEN characters
-    token->value = malloc(p_buffer + 1);
+    token->value = malloc(len);
+    if (token->value == NULL) {
+        ecjp_printf("%s - %d: Memory allocation error for item token value\n", __FUNCTION__,__LINE__);
+        token->value_size = 0;
+        return 0;
+    }   
     // null terminate the string
     tmp_buffer[p_buffer] = '\0';
-    token->value_size = p_buffer + 1;
-    strncpy(token->value, tmp_buffer, p_buffer + 1);
+    token->value_size = len;
+    strncpy(token->value, tmp_buffer, len);
 
     ecjp_printf("%s - %d: Loaded item token of type %s, size %u, value: %s\n", __FUNCTION__,__LINE__, ecjp_type[token->type], token->value_size, (char *)token->value);
-    return;
+    return len;
 }
 
 /*
@@ -3152,7 +3199,7 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
                                     if (ecjp_get_level_parse_stack(&(p->parse_stack)) == 0) {
                                         if (item_list != NULL)
                                         {
-                                            ecjp_load_item(&token, tmp_buffer, p_buffer);
+                                           res->memory_used += ecjp_load_item(&token, tmp_buffer, p_buffer);
                                             // Add item token to the list
                                             if (ecjp_add_node_item_end(item_list, &token) != 0) {
                                                 res->err_pos = p->index;
@@ -3162,6 +3209,7 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
 #ifdef DEBUG_VERBOSE
                                                 ecjp_printf("%s - %d: Added item token to the list, item_list = %p\n", __FUNCTION__,__LINE__, (void *)*item_list);
 #endif
+                                                res->memory_used += sizeof(ecjp_item_elem_t);
                                                 res->num_keys++;
                                             }
                                         }
@@ -3285,7 +3333,7 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
                         if (ecjp_get_level_parse_stack(&(p->parse_stack)) == 0) {
                             if (item_list != NULL)
                             {
-                                ecjp_load_item(&token, tmp_buffer, p_buffer);
+                                res->memory_used += ecjp_load_item(&token, tmp_buffer, p_buffer);
                                 // Add item token to the list
                                 if (ecjp_add_node_item_end(item_list, &token) != 0) {
                                     res->err_pos = p->index;
@@ -3295,6 +3343,7 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
 #ifdef DEBUG_VERBOSE
                                     ecjp_printf("%s - %d: Added item token to the list, item_list = %p\n", __FUNCTION__,__LINE__, (void *)*item_list);
 #endif
+                                    res->memory_used += sizeof(ecjp_item_elem_t);
                                     res->num_keys++;
                                 }
                             }
@@ -3330,7 +3379,7 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
                         if (ecjp_get_level_parse_stack(&(p->parse_stack)) == 0) {
                             if (item_list != NULL)
                             {
-                                ecjp_load_item(&token, tmp_buffer, p_buffer);
+                                res->memory_used += ecjp_load_item(&token, tmp_buffer, p_buffer);
                                 // Add item token to the list
                                 if (ecjp_add_node_item_end(item_list, &token) != 0) {
                                     res->err_pos = p->index;
@@ -3340,6 +3389,7 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
 #ifdef DEBUG_VERBOSE
                                     ecjp_printf("%s - %d: Added item token to the list, item_list = %p\n", __FUNCTION__,__LINE__, (void *)*item_list);
 #endif
+                                    res->memory_used += sizeof(ecjp_item_elem_t);
                                     res->num_keys++;
                                 }
                             }
@@ -3375,7 +3425,7 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
                         if (ecjp_get_level_parse_stack(&(p->parse_stack)) == 0) {
                             if (item_list != NULL)
                             {
-                                ecjp_load_item(&token, tmp_buffer, p_buffer);
+                                res->memory_used += ecjp_load_item(&token, tmp_buffer, p_buffer);
                                 // Add item token to the list
                                 if (ecjp_add_node_item_end(item_list, &token) != 0) {
                                     res->err_pos = p->index;
@@ -3385,6 +3435,7 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
 #ifdef DEBUG_VERBOSE
                                     ecjp_printf("%s - %d: Added item token to the list, item_list = %p\n", __FUNCTION__,__LINE__, (void *)*item_list);
 #endif
+                                    res->memory_used += sizeof(ecjp_item_elem_t);
                                     res->num_keys++;
                                 }
                             }
@@ -3446,6 +3497,8 @@ ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **i
 #ifdef DEBUG_VERBOSE
     ecjp_print_check_summary(p);
 #endif
+    ecjp_printf("%s - %d: Allocated memory used: %d bytes\n", __FUNCTION__,__LINE__, res->memory_used);
+
 
     return ECJP_NO_ERROR;
 };
@@ -3517,6 +3570,125 @@ ecjp_return_code_t ecjp_split_key_and_value(ecjp_item_elem_t *item_list, char *k
 
     return ECJP_NO_ERROR;
 }
+
+/*
+ * Function: ecjp_read_element()
+ * --------------------
+ * Reads an element from the item list by its index and copies its value to the output structure.
+ * Parameters:
+ *      item_list: Pointer to the head of the ecjp_item_elem_t linked list.
+ *      index: The index of the element to read.
+ *      out: Pointer to an ecjp_outdata_t structure where the output will be stored.
+ * Returns:
+ *  ECJP_NO_ERROR on success
+ *  ECJP_NULL_POINTER if item_list or out is NULL
+ *  ECJP_INDEX_OUT_OF_BOUNDS if the index is out of bounds
+*/
+ecjp_return_code_t ecjp_read_element(ecjp_item_elem_t *item_list, int index, ecjp_outdata_t *out)
+{
+    int current_index;
+    current_index = 0;
+
+    if (item_list == NULL || out == NULL) {
+        return ECJP_NULL_POINTER;
+    }
+
+    while ((item_list != NULL) && (current_index <= index)) {
+        if (current_index == index) {
+            ecjp_printf("%s - %d: Find element of index %d: Type = %s, Value = %s\n", __FUNCTION__, __LINE__,index, ecjp_type[item_list->item.type], (char *)item_list->item.value);
+            if ((out->value != NULL) && (out->value_size >= item_list->item.value_size)) {
+                memset(out->value, 0, out->value_size);
+                out->type = item_list->item.type;
+                out->value_size = item_list->item.value_size;
+                memcpy(out->value, item_list->item.value, out->value_size);
+            }
+            break;
+        }
+        item_list = item_list->next;
+        current_index++;
+    }
+    if (item_list == NULL) {
+        return ECJP_INDEX_OUT_OF_BOUNDS;
+    }
+
+    return ECJP_NO_ERROR;
+}
+
+/*
+ * Function: ecjp_read_key_2()
+ * --------------------
+ * Reads the value associated with a specified key from the item list, starting from a given index.
+ * Parameters:
+ *      item_list: Pointer to the head of the ecjp_item_elem_t linked list.
+ *      key: The key to search for.
+ *      index: The starting index for the search.
+ *      out: Pointer to an ecjp_outdata_t structure where the output will be stored.
+ * Returns:
+ *  ECJP_NO_ERROR on success
+ *  ECJP_NULL_POINTER if item_list, key, or out is NULL
+ *  ECJP_INDEX_NOT_FOUND if the key is not found in the list
+*/
+ecjp_return_code_t ecjp_read_key_2(ecjp_item_elem_t *item_list, const char *key, unsigned int index, ecjp_outdata_t *out)
+{
+    ecjp_item_elem_t *current_item;
+    int current_index;
+    char extracted_key[ECJP_MAX_KEY_LEN] = {0};
+    char extracted_value[ECJP_MAX_KEY_VALUE_LEN] = {0};
+    ecjp_return_code_t split_res;
+
+    current_index = 0;
+
+    if (item_list == NULL || key == NULL || out == NULL) {
+        return ECJP_NULL_POINTER;
+    }
+#ifdef DEBUG_VERBOSE
+    ecjp_printf("%s - %d: Search for key: %s starting from index %d\n", __FUNCTION__, __LINE__, key, index);
+#endif
+
+    current_item = item_list;
+    while (current_item != NULL) {
+        split_res = ECJP_NO_ERROR;
+        memset(extracted_key, 0, ECJP_MAX_KEY_LEN);
+        memset(extracted_value, 0, ECJP_MAX_KEY_VALUE_LEN);
+
+        if (current_index < index) {
+            current_item = current_item->next;
+            current_index++;
+            continue;
+        }
+        if (current_item->item.type == ECJP_TYPE_KEY_VALUE_PAIR) {
+            split_res = ecjp_split_key_and_value(current_item, extracted_key, extracted_value, ECJP_BOOL_FALSE);
+            if (split_res != ECJP_NO_ERROR) {
+                ecjp_printf("%s - %d: Fail to split key and value pair (res = %d)\n", __FUNCTION__, __LINE__,split_res);
+                return split_res;
+            }
+#ifdef DEBUG_VERBOSE
+            ecjp_printf("%s - %d: extracted_key = %s, extracted_value = %s\n", __FUNCTION__, __LINE__, extracted_key, extracted_value);
+#endif
+            if (strncmp(extracted_key, key, strlen(extracted_key)) == 0) {
+#ifdef DEBUG_VERBOSE
+                ecjp_printf("%s - %d: Found key: %s with value: %s\n", __FUNCTION__, __LINE__, extracted_key, extracted_value);
+#endif
+                if ((out->value != NULL) && (out->value_size >= current_item->item.value_size)) {
+                    memset(out->value, 0, out->value_size);
+                    out->type = current_item->item.type;
+                    out->value_size = strlen(extracted_value) + 1;
+                    memcpy(out->value, extracted_value, out->value_size);
+                    out->last_pos = current_index;
+                    out->error_code = ECJP_NO_ERROR;
+                }
+                return ECJP_NO_ERROR;
+            }
+        }
+        current_item = current_item->next;
+        current_index++;
+    }
+#ifdef DEBUG_VERBOSE
+    ecjp_printf("%s - %d: Fail with error ECJP_INDEX_NOT_FOUND\n", __FUNCTION__, __LINE__);
+#endif
+    return ECJP_INDEX_NOT_FOUND;
+}
+
 
 
 /* TO DO: work in progress */
