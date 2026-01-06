@@ -11,6 +11,8 @@
     #define ecjp_fprint(format)
 #endif
 
+#ifdef ECJP_TOKEN_LIST
+
 void usage(char *prog_name)
 {
     ecjp_fprintf("Usage: %s [filename]\n", prog_name);
@@ -49,11 +51,11 @@ int main(int argc, char *argv[])
                     ptr[read_bytes] = '\0';
                     fclose(f);
                     ecjp_fprintf("\nTesting JSON file (%s) of size %ld bytes:\n", argv[1], file_size);
-                    ret = ecjp_check_syntax(ptr,&results);
+                    ret = ecjp_check_syntax_2(ptr,&results);
                     if (ret != ECJP_NO_ERROR) {
-                        ecjp_fprintf("ecjp_check_syntax() on JSON file: FAILED with error code: %d\n", ret);
+                        ecjp_fprintf("ecjp_check_syntax_2() on JSON file: FAILED with error code: %d\n", ret);
                         if (results.err_pos >= 0) {
-                            ecjp_fprintf("ecjp_check_syntax(): Error position: %d\n", results.err_pos);
+                            ecjp_fprintf("ecjp_check_syntax_2(): Error position: %d\n", results.err_pos);
                             if(results.err_pos >= 1024) {
                                 ecjp_fprint("Error position is beyond 1024 characters, showing context around error:\n");
                                 int start_pos = results.err_pos - 512;
@@ -73,8 +75,8 @@ int main(int argc, char *argv[])
                         return -1;
                     }
                     else {
-                        ecjp_fprint("ecjp_check_syntax() on JSON file: SUCCEEDED.\n");
-                        ecjp_fprintf("ecjp_check_syntax() - num. keys found = %d, struct type = %d.\n",results.num_keys,results.struct_type);
+                        ecjp_fprint("ecjp_check_syntax_2() on JSON file: SUCCEEDED.\n");
+                        ecjp_fprintf("ecjp_check_syntax_2() - num. keys found = %d, struct type = %d.\n",results.num_keys,results.struct_type);
                     }
                     free(ptr);
                     ptr = NULL;
@@ -98,4 +100,14 @@ int main(int argc, char *argv[])
 
     return 0;
 }
+
+#else
+
+int main(int argc, char *argv[])
+{
+    ecjp_fprint("This example is for key list implementation. Compile with ECJP_TOKEN_LIST defined.\n");
+    return -1;
+}
+
+#endif // ECJP_TOKEN_LIST
 

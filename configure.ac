@@ -21,6 +21,10 @@ AC_ARG_ENABLE([debug-verbose],
     [AS_HELP_STRING([--enable-debug-verbose], [Enable DEBUG_VERBOSE macro])],
     [debug_verbose_flag=yes], [debug_verbose_flag=no])
 
+AC_ARG_ENABLE([token-list],
+    [AS_HELP_STRING([--enable-token-list], [Enable ECJP_TOKEN_LIST macro])],
+    [token_list_flag=yes], [token_list_flag=no])
+
 AC_ARG_ENABLE([run-on-pc],
     [AS_HELP_STRING([--enable-run-on-pc], [Enable ECJP_RUN_ON_PC macro])],
     [run_on_pc_flag=yes], [run_on_pc_flag=no])
@@ -36,6 +40,10 @@ fi
 
 if test "x$debug_verbose_flag" = "xyes"; then
     AC_DEFINE([DEBUG_VERBOSE], [1], [Enable verbose debug output])
+fi
+
+if test "x$token_list_flag" = "xyes"; then
+    AC_DEFINE([ECJP_TOKEN_LIST], [1], [Enable ECJP_TOKEN_LIST])
 fi
 
 if test "x$run_on_pc_flag" = "xyes"; then

@@ -66,7 +66,8 @@ char *ecjp_type[ECJP_TYPE_MAX_TYPES] = {
     "KEY_VALUE_PAIR"
 };
 
-// Internal function definitions
+/* Internal function definitions */
+
 /*
     Function: ecjp_is_whitespace()
         This function checks if a character is a whitespace character.
@@ -223,79 +224,6 @@ int ecjp_get_level_parse_stack(ecjp_parse_stack_item_t *s)
     return s->top;
 };
 
-/*
- * Function: ecjp_add_node_end()
-        This function adds a new key token node to the end of the linked list.
-        Parameters:
-        - head: Pointer to the head of the linked list.
-        - data: Pointer to the key token data to add.
-        Returns:
-        - 0 on success.
-        - -1 on memory allocation failure.
-*/
-int ecjp_add_node_end(ecjp_key_elem_t **head, ecjp_key_token_t *data)
-{
-    ecjp_key_elem_t  *new_node;
-    ecjp_key_elem_t  *current;
-
-    new_node = (ecjp_key_elem_t *)malloc(sizeof(ecjp_key_elem_t));
-    if (!new_node)
-        return -1;
-    new_node->key.start_pos = data->start_pos;
-    new_node->key.length = data->length;
-    new_node->key.type = data->type;
-    new_node->next = NULL;
-    if (*head == NULL)
-    {
-        *head = new_node;
-    }
-    else
-    {
-        current = *head;
-        while (current->next != NULL)
-            current = current->next;
-        current->next = new_node;
-    }
-    return 0;
-}
-
-/*
- * Function: ecjp_add_node_item_end()
-        This function adds a new item token node to the end of the linked list.
-        Parameters:
-        - head: Pointer to the head of the linked list.
-        - data: Pointer to the item token data to add.
-        Returns:
-        - 0 on success.
-        - -1 on memory allocation failure.
-*/
-int ecjp_add_node_item_end(ecjp_item_elem_t **head, ecjp_item_token_t *data)
-{
-    ecjp_item_elem_t  *new_node;
-    ecjp_item_elem_t  *current;
-    
-    new_node = (ecjp_item_elem_t *)malloc(sizeof(ecjp_item_elem_t));
-    if (!new_node)  
-        return -1;
-    new_node->item.type = data->type;
-    new_node->item.value = data->value;
-    new_node->item.value_size = data->value_size;
-    new_node->next = NULL;
-    if (*head == NULL)
-    {
-        *head = new_node;
-    }
-    else
-    {
-        current = *head;
-        while (current->next != NULL)
-            current = current->next;
-        current->next = new_node;
-    }
-    return 0;
-}
-
-
 #ifdef DEBUG_VERBOSE
 /* 
  * Function: ecjp_print_check_summary()
@@ -325,46 +253,9 @@ void ecjp_print_check_summary(ecjp_parser_data_t *p)
 };
 #endif
 
-/*
- * Function: ecjp_internal_copy_array_element()
-        This function copies an array element from a buffer to an output structure if it matches the requested index.
-        Parameters:
-        - buffer: The buffer containing the array element.
-        - p_buffer: The size of the buffer.
-        - index: The index of the requested array element.
-        - num_elements: The current number of elements processed.
-        - out: Pointer to an output structure to store the array element's details.
-        Returns:
-        - ECJP_INDEX_NOT_FOUND if the requested index does not match the current element.
-        - ECJP_NO_ERROR if the requested element is found and copied to out.
-*/
-ecjp_return_code_t ecjp_internal_copy_array_element(char *buffer, unsigned int p_buffer, int index, int num_elements, ecjp_outdata_t *out)
-{
-    ecjp_return_code_t ret = ECJP_INDEX_NOT_FOUND;
 
-    // check if this is the requested element
-    if ((index != ECJP_ARRAY_NO_INDEX) && (num_elements - 1 == index)) {
-        // found requested element
-        if (p_buffer >= ECJP_MAX_ARRAY_ELEM_LEN) {
-            ecjp_printf("%s - %d: Value buffer too small, truncated to %d bytes\n", __FUNCTION__,__LINE__,(ECJP_MAX_ARRAY_ELEM_LEN - 1));
-        }
-        // copy to out structure
-        if ((out->value != NULL) && (out->value_size > 0)) {
-            strncpy(out->value, buffer, (p_buffer < out->value_size) ? p_buffer : (out->value_size - 1));
-            *(char *)(out->value + ((p_buffer < out->value_size) ? p_buffer : (out->value_size - 1))) = '\0'; // null terminate
-            out->length = (p_buffer < out->value_size) ? p_buffer : (out->value_size - 1);
-            out->error_code = ECJP_NO_ERROR;
-            ret = out->error_code;
-        } else {
-            out->error_code = ECJP_NO_SPACE_IN_BUFFER_VALUE;
-            ret = out->error_code;
-        }
-    }
-    return ret;
-}
+/* Public function definitions */
 
-
-// External function definitions
 /*
     Function: ecjp_dummy()
         A simple dummy function to test library linkage.
@@ -472,6 +363,1363 @@ ecjp_return_code_t ecjp_show_error(const char *input, int err_pos)
     }
     return ECJP_NO_ERROR;
 };
+
+
+#ifdef ECJP_TOKEN_LIST
+
+/******* ALTERNATIVE IMPLEMENTATION *********/
+/* 
+In this implementation, we parse the input string and extract item tokens (values) instead of keys.
+We store these item tokens in a linked list passed as a parameter.
+This implementation is useful when the focus is on the values rather than the keys but use much more memory.
+*/
+
+/* Internal API functions */
+
+/*
+ *  Function: ecjp_store_tmp_item()
+    This function store a character in the temporary buffer for building an item token value.
+    Parameters:
+    - buffer: The temporary buffer to store the character.
+    - p_buffer: Pointer to the current position in the buffer.
+    - c: The character to be stored.
+    Returns:
+    - ECJP_NO_ERROR if the character is stored successfully.
+    - ECJP_NO_SPACE_IN_BUFFER_VALUE if the buffer exceeds maximum length.
+*/
+ecjp_return_code_t ecjp_store_tmp_item(char *buffer, int *p_buffer, char c)
+{
+    if(*p_buffer >= (ECJP_MAX_ITEM_LEN - 1)) {
+        ecjp_printf("%s - %d: Item length exceeds maximum limit (p_buffer = %d, limit = %d)\n", __FUNCTION__,__LINE__, *p_buffer, ECJP_MAX_ITEM_LEN);
+        return ECJP_NO_SPACE_IN_BUFFER_VALUE;
+    }
+    buffer[*p_buffer] = c;
+    (*p_buffer)++;
+#ifdef DEBUG_VERBOSE    
+    ecjp_printf("%s - %d: Stored char '%c' in tmp buffer at position %d\n", __FUNCTION__,__LINE__, c, *p_buffer - 1);
+#endif
+    return ECJP_NO_ERROR;
+}
+
+/*
+ *  Function: ecjp_load_item()
+    This function load an item token from the temporary buffer.
+    Parameters:
+    - token: Pointer to the item token structure to be loaded.
+    - tmp_buffer: The temporary buffer containing the item value.
+    - p_buffer: The size of the item value in the buffer.
+    Returns:
+    - The length of the loaded item token value.
+    - 0 if there is a memory allocation error.
+*/
+int ecjp_load_item(ecjp_item_token_t *token, char *tmp_buffer, int p_buffer)
+{
+    int len = (p_buffer + 1);
+
+    // allocate memory for token value, copy tmp_buffer to token value
+    // in tmp_buffer there are no more than ECJP_MAX_ITEM_LEN characters
+    token->value = malloc(len);
+    if (token->value == NULL) {
+        ecjp_printf("%s - %d: Memory allocation error for item token value\n", __FUNCTION__,__LINE__);
+        token->value_size = 0;
+        return 0;
+    }   
+    // null terminate the string
+    tmp_buffer[p_buffer] = '\0';
+    token->value_size = len;
+    strncpy(token->value, tmp_buffer, len);
+
+    ecjp_printf("%s - %d: Loaded item token of type %s, size %u, value: %s\n", __FUNCTION__,__LINE__, ecjp_type[token->type], token->value_size, (char *)token->value);
+    return len;
+}
+
+/*
+ *  Function: ecjp_reset_tmp_buffer()
+    This function reset the temporary buffer for building an item token value.
+    Parameters:
+    - tmp_buffer: The temporary buffer to be reset.
+    - p_buffer: Pointer to the current position in the buffer to be reset.
+*/
+void ecjp_reset_tmp_buffer(char *tmp_buffer, int *p_buffer)
+{
+    memset(tmp_buffer, 0, ECJP_MAX_ITEM_LEN);
+    *p_buffer = 0;
+    return;
+}
+
+/*
+ *  Function: ecjp_init_item_token()
+    This function initialize an item token structure.
+    Parameters:
+    - token: Pointer to the item token structure to be initialized.
+*/
+void ecjp_init_item_token(ecjp_item_token_t *token)
+{
+    token->type = ECJP_TYPE_UNDEFINED;
+    token->value = NULL;
+    token->value_size = 0;
+    return;
+}
+
+/*
+ *  Function: ecjp_free_item_token()
+    This function free the memory allocated for an item token structure.
+    Parameters:
+    - token: Pointer to the item token structure to be freed.
+*/
+void ecjp_free_item_token(ecjp_item_token_t *token)
+{
+    if (token->value != NULL) {
+        free(token->value);
+        token->value = NULL;
+    }
+    token->value_size = 0;
+    token->type = ECJP_TYPE_UNDEFINED;
+    return;
+}
+
+/*
+ * Function: ecjp_add_node_item_end()
+        This function adds a new item token node to the end of the linked list.
+        Parameters:
+        - head: Pointer to the head of the linked list.
+        - data: Pointer to the item token data to add.
+        Returns:
+        - 0 on success.
+        - -1 on memory allocation failure.
+*/
+int ecjp_add_node_item_end(ecjp_item_elem_t **head, ecjp_item_token_t *data)
+{
+    ecjp_item_elem_t  *new_node;
+    ecjp_item_elem_t  *current;
+    
+    new_node = (ecjp_item_elem_t *)malloc(sizeof(ecjp_item_elem_t));
+    if (!new_node)  
+        return -1;
+    new_node->item.type = data->type;
+    new_node->item.value = data->value;
+    new_node->item.value_size = data->value_size;
+    new_node->next = NULL;
+    if (*head == NULL)
+    {
+        *head = new_node;
+    }
+    else
+    {
+        current = *head;
+        while (current->next != NULL)
+            current = current->next;
+        current->next = new_node;
+    }
+    return 0;
+}
+
+/* Public API functions */
+
+/* 
+ *  Function: ecjp_free_item_list()
+    This function free the memory allocated for a list of item elements.
+    Parameters:
+    - item_list: Pointer to the list of item elements to be freed.
+    Returns:
+    - ECJP_NO_ERROR if the list is freed successfully.
+*/
+ecjp_return_code_t ecjp_free_item_list(ecjp_item_elem_t **item_list)
+{
+    ecjp_item_elem_t *current;
+    ecjp_item_elem_t *next;
+
+    if(item_list == NULL || *item_list == NULL)
+        return ECJP_NO_ERROR;
+        
+    current = *item_list;
+
+    while (current != NULL) {
+        free(current->item.value);
+        next = current->next;
+        free(current);
+        current = next;
+    }
+    *item_list = NULL;
+
+    return ECJP_NO_ERROR;
+}
+
+/* 
+ * Function: ecjp_check_and_load_2()
+    This function checks the syntax of a JSON-like input string and loads item tokens (values)
+    into a linked list if the syntax is valid.
+    Parameters:
+    - input: The JSON-like input string to be checked and loaded.
+    - item_list: Pointer to a list of item elements loaded with the item tokens found in the input string.
+    - res: Pointer to a structure to store the result of the check, including any error position.
+    Returns:
+    - ECJP_NO_ERROR if the input string is valid.
+    - ECJP_NULL_POINTER if any input pointer is NULL.
+    - ECJP_EMPTY_STRING if the input string is empty.
+    - ECJP_SYNTAX_ERROR if there is a syntax error in the input string.
+*/
+ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **item_list, ecjp_check_result_t *res)
+{
+    ecjp_parser_data_t parser_data;
+    ecjp_parser_data_t *p;
+    ecjp_item_token_t token;
+    char tmp_buffer[ECJP_MAX_ITEM_LEN];
+    int p_buffer = 0;
+
+    memset(tmp_buffer, 0, ECJP_MAX_ITEM_LEN);
+    memset(&token, 0, sizeof(ecjp_item_token_t));
+    memset(&parser_data, 0, sizeof(ecjp_parser_data_t));
+    p =  &parser_data;
+    p->parse_stack.top = -1;
+
+    if ((input == NULL) || (res == NULL)) {
+        ecjp_printf("%s - %d: NULL pointer input/res\n",__FUNCTION__,__LINE__);
+        return ECJP_NULL_POINTER;
+    }
+    if (strlen(input) == 0) {
+        ecjp_printf("%s - %d: Empty string input\n",__FUNCTION__,__LINE__);
+        return ECJP_EMPTY_STRING;
+    }
+#ifdef DEBUG_VERBOSE
+    ecjp_printf("%s - %d:\nInput string: %s\n",__FUNCTION__,__LINE__,input);
+#endif
+
+    p->index = 0;
+    p->flags.all = 0;
+    p->status = ECJP_PS_START;
+    while (input[p->index] != '\0') {
+        // walk through the string
+#ifdef DEBUG_VERBOSE        
+        ecjp_printf("%s - %d: Index %d, Status %d, Char '%c'\n", __FUNCTION__,__LINE__, p->index, p->status, input[p->index]);
+#endif
+        switch (p->status)
+        {
+            case ECJP_PS_START:
+                switch (input[p->index]) {
+                    case ' ':
+                    case '\n':
+                    case '\r':
+                    case '\t':
+                        // skip whitespace
+                        p->index++;
+                        continue;
+
+                    case '{':
+                        p->open_brackets++;
+                        p->num_objects++;
+                        if(ecjp_push_parse_stack(&(p->parse_stack), '{') == ECJP_BOOL_FALSE) {
+                            res->err_pos = p->index;
+                            return ECJP_GENERIC_ERROR;
+                        }   
+                        p->status = ECJP_PS_IN_OBJECT;
+                        res->struct_type = ECJP_ST_OBJ;
+                        break;
+
+                    case '[':
+                        p->open_square_brackets++;
+                        p->num_arrays++;
+                        if(ecjp_push_parse_stack(&(p->parse_stack), '[') == ECJP_BOOL_FALSE) {
+                            res->err_pos = p->index;
+                            return ECJP_GENERIC_ERROR;
+                        }   
+                        p->status = ECJP_PS_IN_ARRAY;
+                        res->struct_type = ECJP_ST_ARRAY;
+                        break;
+
+                    default:
+                        res->err_pos = p->index;
+                        ecjp_printf("%s - %d: Input must start with '{' or ']'\n", __FUNCTION__,__LINE__);
+                        return ECJP_SYNTAX_ERROR;
+                        break;
+                }
+                break;
+ 
+            case ECJP_PS_IN_OBJECT:
+                switch (input[p->index]) {
+                    case ' ':
+                    case '\n':
+                    case '\r':
+                    case '\t':
+                        // skip whitespace
+                        p->index++;
+                        continue;
+
+                    case '{':
+                        p->open_brackets++;
+                        p->num_objects++;
+                        if(ecjp_push_parse_stack(&(p->parse_stack), '{') == ECJP_BOOL_FALSE) {
+                            res->err_pos = p->index;
+                            return ECJP_GENERIC_ERROR;
+                        }
+                        p->status = ECJP_PS_IN_OBJECT;
+                        // copy in tmp buffer
+                        if (p_buffer == 0) {
+                            token.type = ECJP_TYPE_OBJECT;
+                        }
+                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
+                        break;  
+
+                    case '}':
+                        p->open_brackets--;
+                        if (p->open_brackets < 0) {
+                            res->err_pos = p->index;
+                            ecjp_printf("%s - %d: Mismatched closing bracket\n", __FUNCTION__,__LINE__);
+                            return ECJP_SYNTAX_ERROR;
+                        }
+                        if (p->flags.trailing_comma) {
+                            res->err_pos = p->index;
+                            ecjp_printf("%s - %d: Trailing comma before closing bracket\n", __FUNCTION__,__LINE__);
+                            return ECJP_SYNTAX_ERROR;
+                        }
+                        if (ecjp_pop_parse_stack(&(p->parse_stack), '{') == ECJP_BOOL_FALSE) {
+                            res->err_pos = p->index;
+                            ecjp_printf("%s - %d: Unexpected closing bracket\n", __FUNCTION__,__LINE__);
+                            return ECJP_SYNTAX_ERROR;
+                        }
+                        if (p->open_brackets == 0 && p->open_square_brackets == 0) {
+                            p->status = ECJP_PS_END;
+                        } else {
+                            p->status = ECJP_PS_WAIT_COMMA;
+                            ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
+                        }
+                        break;
+
+                    case ',':
+                        if (p->flags.trailing_comma) {
+                            res->err_pos = p->index;
+                            ecjp_printf("%s - %d: Multiple trailing commas\n", __FUNCTION__,__LINE__);
+                            return ECJP_SYNTAX_ERROR;
+                        }
+                        p->flags.trailing_comma = 1;
+                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
+                        break;
+
+                    case '"':
+                        p->flags.in_string = 1;
+                        p->status = ECJP_PS_IN_KEY;
+                        p->flags.in_key = 1;
+                        p->flags.trailing_comma = 0;
+                        if (p_buffer == 0) {
+                            token.type = ECJP_TYPE_KEY_VALUE_PAIR;
+                        }
+                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
+                        break;
+                    
+                    default:
+                        res->err_pos = p->index;
+                        ecjp_printf("%s - %d: Expected string key or closing bracket, receive: %c\n", __FUNCTION__,__LINE__,input[p->index]);
+                        return ECJP_SYNTAX_ERROR;
+                        break;  
+                }
+                break;
+            
+            case ECJP_PS_IN_ARRAY:
+                switch (input[p->index]) {
+                    case ' ':
+                    case '\n':
+                    case '\r':
+                    case '\t':
+                        // skip whitespace
+                        p->index++;
+                        continue;
+
+                    case '{':
+                        p->open_brackets++;
+                        p->num_objects++;
+                        if (ecjp_push_parse_stack(&(p->parse_stack), '{') == ECJP_BOOL_FALSE) {
+                            res->err_pos = p->index;
+                            return ECJP_GENERIC_ERROR;
+                        }
+                        p->status = ECJP_PS_IN_OBJECT;
+                        if(p->flags.trailing_comma) {
+                            p->flags.trailing_comma = 0;
+                        }
+                        if (p_buffer == 0) {
+                            token.type = ECJP_TYPE_OBJECT;
+                        }
+                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
+                        break;
+
+                    case '}':
+                        p->open_brackets--;
+                        if (p->open_brackets < 0) {
+                            res->err_pos = p->index;
+                            ecjp_printf("%s - %d: Mismatched closing bracket\n", __FUNCTION__,__LINE__);
+                            return ECJP_SYNTAX_ERROR;
+                        }
+                        if (ecjp_pop_parse_stack(&(p->parse_stack), '{') == ECJP_BOOL_FALSE) {
+                            res->err_pos = p->index;
+                            ecjp_printf("%s - %d: Unexpected closing bracket\n", __FUNCTION__,__LINE__);
+                            return ECJP_SYNTAX_ERROR;
+                        }
+                        p->status = ECJP_PS_WAIT_COMMA;
+                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
+                        break;
+
+                    case '[':
+                        p->open_square_brackets++;
+                        p->num_arrays++;
+                        if (ecjp_push_parse_stack(&(p->parse_stack), '[') == ECJP_BOOL_FALSE) {
+                            res->err_pos = p->index;
+                            return ECJP_GENERIC_ERROR;
+                        }
+                        p->status = ECJP_PS_IN_ARRAY;
+                        if (p->flags.trailing_comma) {
+                            p->flags.trailing_comma = 0;
+                        }
+                        if (p_buffer == 0) {
+                            token.type = ECJP_TYPE_ARRAY;
+                        }
+                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
+                        break;
+
+                    case ']':
+                        p->open_square_brackets--;
+                        if (p->open_square_brackets < 0) {
+                            res->err_pos = p->index;
+                            ecjp_printf("%s - %d: Mismatched closing square bracket\n", __FUNCTION__,__LINE__);
+                            return ECJP_SYNTAX_ERROR;
+                        }
+                        if (ecjp_pop_parse_stack(&(p->parse_stack), '[') == ECJP_BOOL_FALSE) {
+                            res->err_pos = p->index;
+                            ecjp_printf("%s - %d: Unexpected closing square bracket\n", __FUNCTION__,__LINE__);
+                            return ECJP_SYNTAX_ERROR;
+                        }
+                        p->status = ECJP_PS_WAIT_COMMA;
+                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
+                        break;
+                    
+                    case '"':
+                        p->flags.in_string = 1;
+                        p->status = ECJP_PS_IN_VALUE;
+                        if (p->flags.trailing_comma) {
+                            p->flags.trailing_comma = 0;
+                        }
+                        if (p_buffer == 0) {
+                            token.type = ECJP_TYPE_STRING;
+                        }
+                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
+                        break;
+
+                    default:
+                        if (strncmp(&input[p->index], "true", 4) == 0 || strncmp(&input[p->index], "false", 5) == 0 || strncmp(&input[p->index], "null", 4) == 0) {
+                            // valid value
+                            p->status = ECJP_PS_WAIT_COMMA;
+                            if (strncmp(&input[p->index], "true", 4) == 0) {
+                                if (p_buffer == 0) {
+                                    token.type = ECJP_TYPE_BOOL;
+                                }
+                                for (int i = 0; i < 4; i++) {
+                                    ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index + i]);
+                                }
+                            } else if (strncmp(&input[p->index], "false", 5) == 0) {
+                                if (p_buffer == 0) {
+                                    token.type = ECJP_TYPE_BOOL;
+                                }
+                                for (int i = 0; i < 5; i++) {
+                                    ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index + i]);
+                                }
+                            } else {
+                                if (p_buffer == 0) {
+                                    token.type = ECJP_TYPE_NULL;
+                                }
+                                for (int i = 0; i < 4; i++) {
+                                    ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index + i]);
+                                }
+                            }   
+                            p->index += (input[p->index] == 'f') ? 5 : 4; // move index forward
+                            if (p->flags.trailing_comma) {
+                                p->flags.trailing_comma = 0;
+                            }   
+                            continue;
+                        }
+                        if ((input[p->index] >= '0' && input[p->index] <= '9') || input[p->index] == '-') {
+                            // valid value start
+                            p->flags.in_number = 1;
+                            if (p_buffer == 0) {
+                                token.type = ECJP_TYPE_NUMBER;
+                            }
+                            if (input[p->index] == '0') {
+                                p->flags.start_zero = 1;
+                            }
+                            p->status = ECJP_PS_IN_VALUE;
+                            if (p->flags.trailing_comma) {
+                                p->flags.trailing_comma = 0;
+                            }
+                            ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);       
+                        } else {
+                            res->err_pos = p->index;
+                            ecjp_printf("%s - %d: Invalid character in value\n", __FUNCTION__,__LINE__);
+                            return ECJP_SYNTAX_ERROR;
+                        }
+                        break;
+                }
+                break;
+            
+            case ECJP_PS_IN_KEY:
+                // in this status we are always inside a string (p->flags.in_string == 1) 
+                switch (input[p->index]) {
+                    case '\\':
+                        // skip escaped character
+                        p->index++;
+                        switch(input[p->index]) {
+                            case '"':
+                            case '\\':
+                            case '/':
+                            case 'b':
+                            case 'f':
+                            case 'r':
+                            case 'n':
+                            case 't':
+                                p->index++;
+                                continue;
+
+                            case 'u':
+                                if(ecjp_is_excode(input[p->index+1]) &&
+                                   ecjp_is_excode(input[p->index+2]) &&
+                                   ecjp_is_excode(input[p->index+3]) &&
+                                   ecjp_is_excode(input[p->index+4])) {
+                                    for (int i = 0; i < 5; i++) {
+                                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index - 1 + i]);
+                                    }
+                                    p->index += 4;
+                                } else {
+                                    res->err_pos = p->index;
+                                    ecjp_printf("%s - %d: Invalid character in unicode sequence\n", __FUNCTION__,__LINE__);
+                                    return ECJP_SYNTAX_ERROR;
+                                }
+                                break;
+
+                            default:
+                                res->err_pos = p->index;
+                                ecjp_printf("%s - %d: Invalid character in escape sequence (%c)\n", __FUNCTION__,__LINE__, input[p->index]);
+                                return ECJP_SYNTAX_ERROR;
+                                break;
+                        }
+                        break;
+
+                    case '"':
+                        p->flags.in_string = 0;
+                        p->status = ECJP_PS_WAIT_COLON;
+                        p->flags.in_key = 0;
+                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
+                        break;
+
+                    default:
+                        if(ecjp_is_ctrl(input[p->index])) {
+                            res->err_pos = p->index;
+                            ecjp_printf("%s - %d: Invalid control character in key\n", __FUNCTION__,__LINE__);
+                            return ECJP_SYNTAX_ERROR;
+                        } else {
+                            ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
+                        }
+                        break;
+                }
+                break;
+
+            case ECJP_PS_WAIT_COLON:
+                switch (input[p->index]) {
+                    case ' ':
+                    case '\n':
+                    case '\r':
+                    case '\t':
+                        // skip whitespace
+                        p->index++;
+                        continue;
+
+                    case ':':
+                        p->status = ECJP_PS_WAIT_VALUE;
+                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
+                        break;
+
+                    default:
+                        res->err_pos = p->index;
+                        ecjp_printf("%s - %d: Expected colon after key, received: %c\n",__FUNCTION__,__LINE__,input[p->index]);
+                        return ECJP_SYNTAX_ERROR;
+                        break;
+                }
+                break;
+
+            case ECJP_PS_WAIT_VALUE:
+                switch (input[p->index]) {
+                    case ' ':
+                    case '\n':
+                    case '\r':
+                    case '\t':
+                        // skip whitespace
+                        p->index++;
+                        continue;
+
+                    case '{':
+                        p->open_brackets++;
+                        p->num_objects++;
+                        if (ecjp_push_parse_stack(&(p->parse_stack), '{') == ECJP_BOOL_FALSE) {
+                            res->err_pos = p->index;
+                            return ECJP_GENERIC_ERROR;
+                        }
+                        p->status = ECJP_PS_IN_OBJECT;
+                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
+                        break;
+
+                    case '[':
+                        p->open_square_brackets++;
+                        p->num_arrays++;
+                        if (ecjp_push_parse_stack(&(p->parse_stack), '[') == ECJP_BOOL_FALSE) {
+                            res->err_pos = p->index;
+                            return ECJP_GENERIC_ERROR;
+                        }
+                        p->status = ECJP_PS_IN_ARRAY;
+                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
+                        break;
+
+                    case '"':
+                        p->flags.in_string = 1;
+                        p->status = ECJP_PS_IN_VALUE;
+                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
+                        break;
+
+                    default:
+                        if (strncmp(&input[p->index], "true", 4) == 0 || strncmp(&input[p->index], "false", 5) == 0 || strncmp(&input[p->index], "null", 4) == 0) {
+                            // valid value
+                            p->status = ECJP_PS_WAIT_COMMA;
+                            if (strncmp(&input[p->index], "true", 4) == 0) {
+                                for (int i = 0; i < 4; i++) {
+                                    ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index + i]);
+                                }
+                            } else if (strncmp(&input[p->index], "false", 5) == 0) {
+                                for (int i = 0; i < 5; i++) {
+                                    ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index + i]);
+                                }
+                            } else {
+                                for (int i = 0; i < 4; i++) {
+                                    ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index + i]);
+                                }
+                            }
+                            p->index += (input[p->index] == 'f') ? 5 : 4; // move index forward
+                            continue;
+                        }
+                        if ((input[p->index] >= '0' && input[p->index] <= '9') || input[p->index] == '-') {
+                            // valid value start
+                            p->flags.in_number = 1;
+                            if (input[p->index] == '0') {
+                                p->flags.start_zero = 1;
+                            }
+                            p->status = ECJP_PS_IN_VALUE;
+                            ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
+                        } else {
+                            res->err_pos = p->index;
+                            ecjp_printf("%s - %d: Invalid character in value\n", __FUNCTION__,__LINE__);
+                            return ECJP_SYNTAX_ERROR;
+                        }
+                        break;
+                }
+                break;
+
+            case ECJP_PS_IN_VALUE:
+                switch(input[p->index]) {
+                    case '"':
+                        if(!p->flags.in_string) {
+                            res->err_pos = p->index;
+                            ecjp_printf("%s - %d: Unexpected quote in value\n", __FUNCTION__,__LINE__);
+                            return ECJP_SYNTAX_ERROR;
+                        }
+                        p->flags.in_string = 0;
+                        p->status = ECJP_PS_WAIT_COMMA;
+                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
+                        break;
+
+                    default:
+                        if (p->flags.in_string) {
+                            switch (input[p->index]) {
+                                case '\\':
+                                    // skip escaped character
+                                    p->index++;
+                                    switch(input[p->index]) {
+                                        case '"':
+                                        case '\\':
+                                        case '/':
+                                        case 'b':
+                                        case 'f':
+                                        case 'r':
+                                        case 'n':
+                                        case 't':
+                                            p->index++;
+                                            continue;
+
+                                        case 'u':
+                                            if(ecjp_is_excode(input[p->index+1]) &&
+                                               ecjp_is_excode(input[p->index+2]) &&
+                                               ecjp_is_excode(input[p->index+3]) &&
+                                               ecjp_is_excode(input[p->index+4])) {
+                                                for (int i = 0; i < 5; i++) {
+                                                    ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index - 1 + i]);
+                                                }
+                                                p->index += 4;
+                                            } else {
+                                                res->err_pos = p->index;
+                                                ecjp_printf("%s - %d: Invalid character in unicode sequence\n", __FUNCTION__,__LINE__);
+                                                return ECJP_SYNTAX_ERROR;
+                                            }
+                                            break;
+
+                                        default:
+                                            res->err_pos = p->index;
+                                            ecjp_printf("%s - %d: Invalid character in escape sequence (%c)\n", __FUNCTION__,__LINE__, input[p->index]);
+                                            return ECJP_SYNTAX_ERROR;
+                                            break;
+                                    }
+                                    break;
+
+                                default:
+                                    if (ecjp_is_ctrl(input[p->index])) {
+                                        res->err_pos = p->index;
+                                        ecjp_printf("%s - %d: Invalid control character inside value\n", __FUNCTION__,__LINE__);
+                                        return ECJP_SYNTAX_ERROR;
+                                    }
+                                    ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
+                                    break;
+                            }
+                        } else {
+                            switch (input[p->index]) {
+                                case ' ':
+                                case '\n':
+                                case '\r':
+                                case '\t':
+                                    if (p->flags.in_number) {
+                                        p->flags.in_number = 0;
+                                        p->flags.start_zero = 0;
+                                        p->status = ECJP_PS_WAIT_COMMA;
+                                    }
+                                    else {
+                                        // skip whitespace
+                                        p->index++;
+                                        continue;
+                                    }
+                                    break;
+                                
+                                case ',':
+                                    if(p->flags.trailing_comma) {
+                                        res->err_pos = p->index;
+                                        ecjp_printf("%s - %d: Multiple trailing commas\n", __FUNCTION__,__LINE__);
+                                        return ECJP_SYNTAX_ERROR;
+                                    }
+                                    if (p->flags.in_number) {
+                                        p->flags.in_number = 0;
+                                        p->flags.start_zero = 0;
+                                    }
+                                    p->flags.trailing_comma = 1;
+                                    if (ecjp_peek_parse_stack(&(p->parse_stack),'[') == ECJP_BOOL_TRUE) {
+                                        p->status = ECJP_PS_IN_ARRAY;
+                                    } else {
+                                        p->status = ECJP_PS_IN_OBJECT;
+                                    }
+                                    if (ecjp_get_level_parse_stack(&(p->parse_stack)) == 0) {
+                                        if (item_list != NULL)
+                                        {
+                                           res->memory_used += ecjp_load_item(&token, tmp_buffer, p_buffer);
+                                            // Add item token to the list
+                                            if (ecjp_add_node_item_end(item_list, &token) != 0) {
+                                                res->err_pos = p->index;
+                                                ecjp_printf("%s - %d: Failed to add item token to the list\n", __FUNCTION__,__LINE__);
+                                                return ECJP_GENERIC_ERROR;
+                                            } else {
+#ifdef DEBUG_VERBOSE
+                                                ecjp_printf("%s - %d: Added item token to the list, item_list = %p\n", __FUNCTION__,__LINE__, (void *)*item_list);
+#endif
+                                                res->memory_used += sizeof(ecjp_item_elem_t);
+                                                res->num_keys++;
+                                            }
+                                        }
+                                        // Reset token for next item
+                                        ecjp_init_item_token(&token);
+                                        ecjp_reset_tmp_buffer(tmp_buffer, &p_buffer);
+                                    } else {
+                                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
+                                    }
+                                    break;
+                                
+                                case '0':
+                                case '1':
+                                case '2':
+                                case '3':
+                                case '4':
+                                case '5':
+                                case '6':
+                                case '7':
+                                case '8':
+                                case '9':
+                                case '.':
+                                case 'e':
+                                case 'E':
+                                case '+':
+                                case '-':
+                                    if (p->flags.in_number) {
+                                        // valid number continuation
+                                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]); 
+                                        if (input[p->index] == '.') {
+                                            if (p->flags.start_zero == 1) {
+                                                p->flags.start_zero = 0;
+                                            }
+                                            break;
+                                        } else {
+                                            if (p->flags.start_zero == 1) {
+                                                // number can start with '0' unless is decimal value
+                                                res->err_pos = p->index;
+                                                ecjp_printf("%s - %d: Number can't start with value 0\n", __FUNCTION__,__LINE__);
+                                                return ECJP_SYNTAX_ERROR;
+                                            }
+                                            break;
+                                        }
+                                    } else {
+                                        res->err_pos = p->index;
+                                        ecjp_printf("%s - %d: Unexpected number character in value\n", __FUNCTION__,__LINE__);
+                                        return ECJP_SYNTAX_ERROR;
+                                    }
+                                    break;
+
+                                case '}':
+                                    if (ecjp_pop_parse_stack(&(p->parse_stack), '{') == ECJP_BOOL_FALSE) {
+                                        res->err_pos = p->index;
+                                        ecjp_printf("%s - %d: Unexpected closing bracket\n", __FUNCTION__,__LINE__);
+                                        return ECJP_SYNTAX_ERROR;
+                                    }
+                                    p->open_brackets--;
+                                    if (p->open_brackets < 0) {
+                                        res->err_pos = p->index;
+                                        ecjp_printf("%s - %d: Mismatched closing bracket\n", __FUNCTION__,__LINE__);
+                                        return ECJP_SYNTAX_ERROR;
+                                    }
+                                    if (p->open_brackets == 0 && p->open_square_brackets == 0) {
+                                        p->status = ECJP_PS_END;
+                                    } else {
+                                        p->status = ECJP_PS_WAIT_COMMA;
+                                    }
+                                    ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
+                                    break;
+
+                                case ']':
+                                    if (ecjp_pop_parse_stack(&(p->parse_stack), '[') == ECJP_BOOL_FALSE) {
+                                        res->err_pos = p->index;
+                                        ecjp_printf("%s - %d: Unexpected closing square bracket\n", __FUNCTION__,__LINE__);
+                                        return ECJP_SYNTAX_ERROR;
+                                    }
+                                    p->open_square_brackets--;
+                                    if (p->open_square_brackets < 0) {
+                                        res->err_pos = p->index;
+                                        ecjp_printf("%s - %d: Mismatched closing square bracket\n", __FUNCTION__,__LINE__);
+                                        return ECJP_SYNTAX_ERROR;
+                                    }
+                                    if (p->open_square_brackets == 0 && p->open_brackets == 0) {
+                                        p->status = ECJP_PS_END;
+                                    } else {
+                                        p->status = ECJP_PS_WAIT_COMMA;
+                                    }
+                                    ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
+                                    break;
+
+                                default:
+                                    res->err_pos = p->index;
+                                    ecjp_printf("%s - %d: Invalid character in value\n", __FUNCTION__,__LINE__);
+                                    return ECJP_SYNTAX_ERROR;
+                                    break;
+                            }
+                        }
+                        break;
+                }
+                break;
+                        
+            case ECJP_PS_WAIT_COMMA:
+                switch (input[p->index]) {
+                    case ' ':
+                    case '\n':
+                    case '\r':
+                    case '\t':
+                        // skip whitespace
+                        p->index++;
+                        continue;
+                    
+                    case '}':
+                        if (p->flags.trailing_comma) {
+                            res->err_pos = p->index;
+                            ecjp_printf("%s - %d: Trailing comma before closing bracket\n", __FUNCTION__,__LINE__);
+                            return ECJP_SYNTAX_ERROR;
+                        }
+                        if (ecjp_get_level_parse_stack(&(p->parse_stack)) > 0) {
+                            ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
+                        }
+                        if (ecjp_get_level_parse_stack(&(p->parse_stack)) == 0) {
+                            if (item_list != NULL)
+                            {
+                                res->memory_used += ecjp_load_item(&token, tmp_buffer, p_buffer);
+                                // Add item token to the list
+                                if (ecjp_add_node_item_end(item_list, &token) != 0) {
+                                    res->err_pos = p->index;
+                                    ecjp_printf("%s - %d: Failed to add item token to the list\n", __FUNCTION__,__LINE__);
+                                    return ECJP_GENERIC_ERROR;
+                                } else {
+#ifdef DEBUG_VERBOSE
+                                    ecjp_printf("%s - %d: Added item token to the list, item_list = %p\n", __FUNCTION__,__LINE__, (void *)*item_list);
+#endif
+                                    res->memory_used += sizeof(ecjp_item_elem_t);
+                                    res->num_keys++;
+                                }
+                            }
+                            // Reset token for next item
+                            ecjp_init_item_token(&token);
+                            ecjp_reset_tmp_buffer(tmp_buffer, &p_buffer);
+                        }
+                        if (ecjp_pop_parse_stack(&(p->parse_stack), '{') == ECJP_BOOL_FALSE) {
+                            res->err_pos = p->index;
+                            ecjp_printf("%s - %d: Unexpected closing bracket\n", __FUNCTION__,__LINE__);
+                            return ECJP_SYNTAX_ERROR;
+                        }
+                        p->open_brackets--;
+                        if (p->open_brackets < 0) {
+                            res->err_pos = p->index;
+                            ecjp_printf("%s - %d: Mismatched closing bracket\n", __FUNCTION__,__LINE__);
+                            return ECJP_SYNTAX_ERROR;
+                        }
+                        if (p->open_brackets == 0 && p->open_square_brackets == 0) {
+                            p->status = ECJP_PS_END;
+                        }
+                        break;
+
+                    case ']':
+                        if (p->flags.trailing_comma) {
+                            res->err_pos = p->index;
+                            ecjp_printf("%s - %d: Trailing comma before closing square bracket\n", __FUNCTION__,__LINE__);
+                            return ECJP_SYNTAX_ERROR;
+                        }
+                        if (ecjp_get_level_parse_stack(&(p->parse_stack)) > 0) {
+                            ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
+                        }
+                        if (ecjp_get_level_parse_stack(&(p->parse_stack)) == 0) {
+                            if (item_list != NULL)
+                            {
+                                res->memory_used += ecjp_load_item(&token, tmp_buffer, p_buffer);
+                                // Add item token to the list
+                                if (ecjp_add_node_item_end(item_list, &token) != 0) {
+                                    res->err_pos = p->index;
+                                    ecjp_printf("%s - %d: Failed to add item token to the list\n", __FUNCTION__,__LINE__);
+                                    return ECJP_GENERIC_ERROR;
+                                } else {
+#ifdef DEBUG_VERBOSE
+                                    ecjp_printf("%s - %d: Added item token to the list, item_list = %p\n", __FUNCTION__,__LINE__, (void *)*item_list);
+#endif
+                                    res->memory_used += sizeof(ecjp_item_elem_t);
+                                    res->num_keys++;
+                                }
+                            }
+                            // Reset token for next item
+                            ecjp_init_item_token(&token);
+                            ecjp_reset_tmp_buffer(tmp_buffer, &p_buffer);
+                        }
+                        if (ecjp_pop_parse_stack(&(p->parse_stack), '[') == ECJP_BOOL_FALSE) {
+                            res->err_pos = p->index;
+                            ecjp_printf("%s - %d: Unexpected closing square bracket\n", __FUNCTION__,__LINE__);
+                            return ECJP_SYNTAX_ERROR;
+                        }
+                        p->open_square_brackets--;
+                        if (p->open_square_brackets < 0) {
+                            res->err_pos = p->index;
+                            ecjp_printf("%s - %d: Mismatched closing square bracket\n", __FUNCTION__,__LINE__);
+                            return ECJP_SYNTAX_ERROR;
+                        }
+                        if (p->open_brackets == 0 && p->open_square_brackets == 0) {
+                            p->status = ECJP_PS_END;
+                        }
+                        break;
+
+                    case ',':
+                        if (p->flags.trailing_comma) {
+                            res->err_pos = p->index;
+                            ecjp_printf("%s - %d: Multiple trailing commas\n", __FUNCTION__,__LINE__);
+                            return ECJP_SYNTAX_ERROR;
+                        }
+                        if (ecjp_get_level_parse_stack(&(p->parse_stack)) > 0) {
+                            ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
+                        }
+                        if (ecjp_get_level_parse_stack(&(p->parse_stack)) == 0) {
+                            if (item_list != NULL)
+                            {
+                                res->memory_used += ecjp_load_item(&token, tmp_buffer, p_buffer);
+                                // Add item token to the list
+                                if (ecjp_add_node_item_end(item_list, &token) != 0) {
+                                    res->err_pos = p->index;
+                                    ecjp_printf("%s - %d: Failed to add item token to the list\n", __FUNCTION__,__LINE__);
+                                    return ECJP_GENERIC_ERROR;
+                                } else {
+#ifdef DEBUG_VERBOSE
+                                    ecjp_printf("%s - %d: Added item token to the list, item_list = %p\n", __FUNCTION__,__LINE__, (void *)*item_list);
+#endif
+                                    res->memory_used += sizeof(ecjp_item_elem_t);
+                                    res->num_keys++;
+                                }
+                            }
+                            // Reset token for next item
+                            ecjp_init_item_token(&token);
+                            ecjp_reset_tmp_buffer(tmp_buffer, &p_buffer);
+                        }
+                        if (ecjp_peek_parse_stack(&(p->parse_stack),'[') == ECJP_BOOL_TRUE) {
+                            p->status = ECJP_PS_IN_ARRAY;
+                        } else {
+                            p->status = ECJP_PS_IN_OBJECT;
+                        }
+                        p->flags.trailing_comma = 1;
+                        break;
+
+                    default:
+                        res->err_pos = p->index;
+                        ecjp_printf("%s - %d: Expected comma after value\n", __FUNCTION__,__LINE__);
+                        return ECJP_SYNTAX_ERROR;
+                        break;
+                }   
+                break;
+        
+            case ECJP_PS_END:
+                // should be only whitespace after end
+                switch (input[p->index]) {
+                    case ' ':
+                    case '\n':
+                    case '\r':
+                    case '\t':
+                        // skip whitespace
+                        p->index++;
+                        continue;
+
+                    default:
+                        res->err_pos = p->index;
+                        ecjp_printf("%s - %d: Unexpected character after end of JSON\n", __FUNCTION__,__LINE__);
+                        return ECJP_SYNTAX_ERROR;
+                }
+                break;
+        
+            default:
+                break;
+        }
+
+        p->index++;
+    }
+
+    if (p->status != ECJP_PS_END) {
+        ecjp_printf("%s - %d: Incomplete JSON structure\n", __FUNCTION__,__LINE__);
+        return ECJP_SYNTAX_ERROR;
+    }
+    if ((p->open_brackets != 0) || (p->open_square_brackets != 0)) {
+        res->err_pos = (p->index - 1);
+        ecjp_printf("%s - %d: Mismatched brackets at end of input\n", __FUNCTION__,__LINE__);
+        return ECJP_BRACKETS_MISSING;
+    }
+
+#ifdef DEBUG_VERBOSE
+    ecjp_print_check_summary(p);
+#endif
+    ecjp_printf("%s - %d: Allocated memory used: %d bytes\n", __FUNCTION__,__LINE__, res->memory_used);
+
+
+    return ECJP_NO_ERROR;
+};
+
+/*
+    Function: ecjp_check_syntax_2()
+    This function call ecjp_check_and_load_2() without pointer to store the items to perform only syntax checking.
+    Parameters:
+    - input: The JSON-like input string to be checked and loaded.
+    - res: Pointer to a structure to store the result of the check, including any error position.
+    Returns:
+    - ECJP_NO_ERROR if the input string is valid.
+    - ECJP_NULL_POINTER if any input pointer is NULL.
+    - ECJP_EMPTY_STRING if the input string is empty.
+    - ECJP_SYNTAX_ERROR if there is a syntax error in the input string.
+*/
+ecjp_return_code_t ecjp_check_syntax_2(const char *input, ecjp_check_result_t *res)
+{
+    return ecjp_check_and_load_2(input, NULL, res);
+}
+
+/*
+    Function: ecjp_load_2()
+    This function call ecjp_check_and_load_2() with pointer to store the items. Perform syntax checking
+    and store all items found in the input string at the first level of the structure.
+    Parameters:
+    - input: The JSON-like input string to be checked and loaded.
+    - item_list: Pointer to a list of item elements loaded with the items found in the input string.
+    - res: Pointer to a structure to store the result of the check, including any error position.
+    Returns:
+    - ECJP_NO_ERROR if the input string is valid.
+    - ECJP_NULL_POINTER if any input pointer is NULL.
+    - ECJP_EMPTY_STRING if the input string is empty.
+    - ECJP_SYNTAX_ERROR if there is a syntax error in the input string.
+*/
+ecjp_return_code_t ecjp_load_2(const char *input, ecjp_item_elem_t **item_list, ecjp_check_result_t *res)
+{    
+    return ecjp_check_and_load_2(input, item_list, res);
+}
+
+/*
+ * Function: ecjp_split_key_and_value()
+ * --------------------
+ * Splits a key-value pair item into separate key and value strings.
+ * Parameters:
+ *      item_list: Pointer to the ecjp_item_elem_t containing the key-value pair.
+ *      key: Pointer to a char array where the extracted key will be stored.
+ *      value: Pointer to a char array where the extracted value will be stored.
+ *      leave_quotes: Boolean flag indicating whether to retain quotes around the key.
+ * Returns:
+ *  ECJP_NO_ERROR on success
+ *  ECJP_NULL_POINTER if any input pointer is NULL
+ *  ECJP_SYNTAX_ERROR if the item is not a key-value pair
+ *  ECJP_NO_SPACE_IN_BUFFER_VALUE if the key or value exceeds maximum length of the buffers
+*/
+ecjp_return_code_t ecjp_split_key_and_value(ecjp_item_elem_t *item_list, char *key, char *value, ecjp_bool_t leave_quotes)
+{
+    int i, j;
+
+    if (item_list == NULL || key == NULL || value == NULL) {
+        return ECJP_NULL_POINTER;
+    }
+
+    if (item_list->item.type != ECJP_TYPE_KEY_VALUE_PAIR) {
+        return ECJP_SYNTAX_ERROR;
+    }
+    for (i = 0; i < item_list->item.value_size && i < ECJP_MAX_KEY_LEN; i++) {
+        if (((char *)item_list->item.value)[i] == ':') {
+            break;
+        }
+        else {
+            if (((char *)item_list->item.value)[i] != '"') {
+                (*key) = ((char *)item_list->item.value)[i];
+                key++;
+            } else {
+                if (leave_quotes) {
+                    (*key) = ((char *)item_list->item.value)[i];
+                    key++;
+                }
+            }
+        }
+    }
+    if (i == ECJP_MAX_KEY_LEN) {
+        return ECJP_NO_SPACE_IN_BUFFER_VALUE;
+    }
+    (*key) = '\0';
+
+    for (j = 0; i < item_list->item.value_size && j < ECJP_MAX_KEY_VALUE_LEN; i++, j++) {
+        if (((char *)item_list->item.value)[i] != ':') {
+            if (((char *)item_list->item.value)[i] != '"') {
+                (*value) = ((char *)item_list->item.value)[i];
+                value++;
+            } else {
+                if (leave_quotes) {
+                    (*value) = ((char *)item_list->item.value)[i];
+                    value++;
+                }
+            }
+        }
+    }
+    if (j == ECJP_MAX_KEY_VALUE_LEN) {
+        return ECJP_NO_SPACE_IN_BUFFER_VALUE;
+    }
+    (*value) = '\0';
+
+    return ECJP_NO_ERROR;
+}
+
+/*
+ * Function: ecjp_read_element()
+ * --------------------
+ * Reads an element from the item list by its index and copies its value to the output structure.
+ * Parameters:
+ *      item_list: Pointer to the head of the ecjp_item_elem_t linked list.
+ *      index: The index of the element to read.
+ *      out: Pointer to an ecjp_outdata_t structure where the output will be stored.
+ * Returns:
+ *  ECJP_NO_ERROR on success
+ *  ECJP_NULL_POINTER if item_list or out is NULL
+ *  ECJP_INDEX_OUT_OF_BOUNDS if the index is out of bounds
+*/
+ecjp_return_code_t ecjp_read_element(ecjp_item_elem_t *item_list, int index, ecjp_outdata_t *out)
+{
+    int current_index;
+    current_index = 0;
+
+    if (item_list == NULL || out == NULL) {
+        return ECJP_NULL_POINTER;
+    }
+
+    while ((item_list != NULL) && (current_index <= index)) {
+        if (current_index == index) {
+            ecjp_printf("%s - %d: Find element of index %d: Type = %s, Value = %s\n", __FUNCTION__, __LINE__,index, ecjp_type[item_list->item.type], (char *)item_list->item.value);
+            if ((out->value != NULL) && (out->value_size >= item_list->item.value_size)) {
+                memset(out->value, 0, out->value_size);
+                out->type = item_list->item.type;
+                out->value_size = item_list->item.value_size;
+                memcpy(out->value, item_list->item.value, out->value_size);
+            }
+            break;
+        }
+        item_list = item_list->next;
+        current_index++;
+    }
+    if (item_list == NULL) {
+        return ECJP_INDEX_OUT_OF_BOUNDS;
+    }
+
+    return ECJP_NO_ERROR;
+}
+
+/*
+ * Function: ecjp_read_key_2()
+ * --------------------
+ * Reads the value associated with a specified key from the item list, starting from a given index.
+ * Parameters:
+ *      item_list: Pointer to the head of the ecjp_item_elem_t linked list.
+ *      key: The key to search for.
+ *      index: The starting index for the search.
+ *      out: Pointer to an ecjp_outdata_t structure where the output will be stored.
+ * Returns:
+ *  ECJP_NO_ERROR on success
+ *  ECJP_NULL_POINTER if item_list, key, or out is NULL
+ *  ECJP_INDEX_NOT_FOUND if the key is not found in the list
+*/
+ecjp_return_code_t ecjp_read_key_2(ecjp_item_elem_t *item_list, const char *key, unsigned int index, ecjp_outdata_t *out)
+{
+    ecjp_item_elem_t *current_item;
+    int current_index;
+    char extracted_key[ECJP_MAX_KEY_LEN] = {0};
+    char extracted_value[ECJP_MAX_KEY_VALUE_LEN] = {0};
+    ecjp_return_code_t split_res;
+
+    current_index = 0;
+
+    if (item_list == NULL || key == NULL || out == NULL) {
+        return ECJP_NULL_POINTER;
+    }
+#ifdef DEBUG_VERBOSE
+    ecjp_printf("%s - %d: Search for key: %s starting from index %d\n", __FUNCTION__, __LINE__, key, index);
+#endif
+
+    current_item = item_list;
+    while (current_item != NULL) {
+        split_res = ECJP_NO_ERROR;
+        memset(extracted_key, 0, ECJP_MAX_KEY_LEN);
+        memset(extracted_value, 0, ECJP_MAX_KEY_VALUE_LEN);
+
+        if (current_index < index) {
+            current_item = current_item->next;
+            current_index++;
+            continue;
+        }
+        if (current_item->item.type == ECJP_TYPE_KEY_VALUE_PAIR) {
+            split_res = ecjp_split_key_and_value(current_item, extracted_key, extracted_value, ECJP_BOOL_FALSE);
+            if (split_res != ECJP_NO_ERROR) {
+                ecjp_printf("%s - %d: Fail to split key and value pair (res = %d)\n", __FUNCTION__, __LINE__,split_res);
+                return split_res;
+            }
+#ifdef DEBUG_VERBOSE
+            ecjp_printf("%s - %d: extracted_key = %s, extracted_value = %s\n", __FUNCTION__, __LINE__, extracted_key, extracted_value);
+#endif
+            if (strncmp(extracted_key, key, strlen(extracted_key)) == 0) {
+#ifdef DEBUG_VERBOSE
+                ecjp_printf("%s - %d: Found key: %s with value: %s\n", __FUNCTION__, __LINE__, extracted_key, extracted_value);
+#endif
+                if ((out->value != NULL) && (out->value_size >= current_item->item.value_size)) {
+                    memset(out->value, 0, out->value_size);
+                    out->type = current_item->item.type;
+                    out->value_size = strlen(extracted_value) + 1;
+                    memcpy(out->value, extracted_value, out->value_size);
+                    out->last_pos = current_index;
+                    out->error_code = ECJP_NO_ERROR;
+                }
+                return ECJP_NO_ERROR;
+            }
+        }
+        current_item = current_item->next;
+        current_index++;
+    }
+#ifdef DEBUG_VERBOSE
+    ecjp_printf("%s - %d: Fail with error ECJP_INDEX_NOT_FOUND\n", __FUNCTION__, __LINE__);
+#endif
+    return ECJP_INDEX_NOT_FOUND;
+}
+
+#else
+
+/* Internal function definitions */
+
+/*
+ * Function: ecjp_add_node_end()
+        This function adds a new key token node to the end of the linked list.
+        Parameters:
+        - head: Pointer to the head of the linked list.
+        - data: Pointer to the key token data to add.
+        Returns:
+        - 0 on success.
+        - -1 on memory allocation failure.
+*/
+int ecjp_add_node_end(ecjp_key_elem_t **head, ecjp_key_token_t *data)
+{
+    ecjp_key_elem_t  *new_node;
+    ecjp_key_elem_t  *current;
+
+    new_node = (ecjp_key_elem_t *)malloc(sizeof(ecjp_key_elem_t));
+    if (!new_node)
+        return -1;
+    new_node->key.start_pos = data->start_pos;
+    new_node->key.length = data->length;
+    new_node->key.type = data->type;
+    new_node->next = NULL;
+    if (*head == NULL)
+    {
+        *head = new_node;
+    }
+    else
+    {
+        current = *head;
+        while (current->next != NULL)
+            current = current->next;
+        current->next = new_node;
+    }
+    return 0;
+}
+
+/*
+ * Function: ecjp_internal_copy_array_element()
+        This function copies an array element from a buffer to an output structure if it matches the requested index.
+        Parameters:
+        - buffer: The buffer containing the array element.
+        - p_buffer: The size of the buffer.
+        - index: The index of the requested array element.
+        - num_elements: The current number of elements processed.
+        - out: Pointer to an output structure to store the array element's details.
+        Returns:
+        - ECJP_INDEX_NOT_FOUND if the requested index does not match the current element.
+        - ECJP_NO_ERROR if the requested element is found and copied to out.
+*/
+ecjp_return_code_t ecjp_internal_copy_array_element(char *buffer, unsigned int p_buffer, int index, int num_elements, ecjp_outdata_t *out)
+{
+    ecjp_return_code_t ret = ECJP_INDEX_NOT_FOUND;
+
+    // check if this is the requested element
+    if ((index != ECJP_ARRAY_NO_INDEX) && (num_elements - 1 == index)) {
+        // found requested element
+        if (p_buffer >= ECJP_MAX_ARRAY_ELEM_LEN) {
+            ecjp_printf("%s - %d: Value buffer too small, truncated to %d bytes\n", __FUNCTION__,__LINE__,(ECJP_MAX_ARRAY_ELEM_LEN - 1));
+        }
+        // copy to out structure
+        if ((out->value != NULL) && (out->value_size > 0)) {
+            strncpy(out->value, buffer, (p_buffer < out->value_size) ? p_buffer : (out->value_size - 1));
+            *(char *)(out->value + ((p_buffer < out->value_size) ? p_buffer : (out->value_size - 1))) = '\0'; // null terminate
+            out->length = (p_buffer < out->value_size) ? p_buffer : (out->value_size - 1);
+            out->error_code = ECJP_NO_ERROR;
+            ret = out->error_code;
+        } else {
+            out->error_code = ECJP_NO_SPACE_IN_BUFFER_VALUE;
+            ret = out->error_code;
+        }
+    }
+    return ret;
+}
 
 /*
     Function: ecjp_print_keys()
@@ -2452,1244 +3700,7 @@ ecjp_return_code_t ecjp_load(const char *input, ecjp_key_elem_t **key_list, ecjp
     return ecjp_check_and_load(input, key_list, res, level);
 }
 
-/******* ALTERNATIVE IMPLEMENTATION *********/
-/* 
-In this implementation, we parse the input string and extract item tokens (values) instead of keys.
-We store these item tokens in a linked list passed as a parameter.
-This implementation is useful when the focus is on the values rather than the keys but use much more memory.
-*/
-
-/*
-    Function: ecjp_check_syntax_2
-    This function call ecjp_check_and_load_2() without pointer to store the items to perform only syntax checking.
-    Parameters:
-    - input: The JSON-like input string to be checked and loaded.
-    - res: Pointer to a structure to store the result of the check, including any error position.
-    Returns:
-    - ECJP_NO_ERROR if the input string is valid.
-    - ECJP_NULL_POINTER if any input pointer is NULL.
-    - ECJP_EMPTY_STRING if the input string is empty.
-    - ECJP_SYNTAX_ERROR if there is a syntax error in the input string.
-*/
-ecjp_return_code_t ecjp_check_syntax_2(const char *input, ecjp_check_result_t *res)
-{
-    return ecjp_check_and_load_2(input, NULL, res);
-}
-
-/*
-    Function: ecjp_load_2
-    This function call ecjp_check_and_load_2() with pointer to store the items to perform syntax checking
-    and store all items found in the input string at nested level less than or equal to the specified level.
-    Parameters:
-    - input: The JSON-like input string to be checked and loaded.
-    - item_list: Pointer to a list of item elements loaded with the items found in the input string.
-    - res: Pointer to a structure to store the result of the check, including any error position.
-    - level: The level of checking to be performed; used to manage keys inside nested structures.
-    Returns:
-    - ECJP_NO_ERROR if the input string is valid.
-    - ECJP_NULL_POINTER if any input pointer is NULL.
-    - ECJP_EMPTY_STRING if the input string is empty.
-    - ECJP_SYNTAX_ERROR if there is a syntax error in the input string.
-*/
-ecjp_return_code_t ecjp_load_2(const char *input, ecjp_item_elem_t **item_list, ecjp_check_result_t *res)
-{    
-    return ecjp_check_and_load_2(input, item_list, res);
-}
-
-/*
- *  Function: ecjp_store_tmp_item
-    This function store a character in the temporary buffer for building an item token value.
-    Parameters:
-    - buffer: The temporary buffer to store the character.
-    - p_buffer: Pointer to the current position in the buffer.
-    - c: The character to be stored.
-    Returns:
-    - ECJP_NO_ERROR if the character is stored successfully.
-    - ECJP_NO_SPACE_IN_BUFFER_VALUE if the buffer exceeds maximum length.
-*/
-ecjp_return_code_t ecjp_store_tmp_item(char *buffer, int *p_buffer, char c)
-{
-    if(*p_buffer >= (ECJP_MAX_ITEM_LEN - 1)) {
-        ecjp_printf("%s - %d: Item length exceeds maximum limit (p_buffer = %d, limit = %d)\n", __FUNCTION__,__LINE__, *p_buffer, ECJP_MAX_ITEM_LEN);
-        return ECJP_NO_SPACE_IN_BUFFER_VALUE;
-    }
-    buffer[*p_buffer] = c;
-    (*p_buffer)++;
-#ifdef DEBUG_VERBOSE    
-    ecjp_printf("%s - %d: Stored char '%c' in tmp buffer at position %d\n", __FUNCTION__,__LINE__, c, *p_buffer - 1);
-#endif
-    return ECJP_NO_ERROR;
-}
-
-/*
- *  Function: ecjp_load_item()
-    This function load an item token from the temporary buffer.
-    Parameters:
-    - token: Pointer to the item token structure to be loaded.
-    - tmp_buffer: The temporary buffer containing the item value.
-    - p_buffer: The size of the item value in the buffer.
-    Returns:
-    - The length of the loaded item token value.
-    - 0 if there is a memory allocation error.
-*/
-int ecjp_load_item(ecjp_item_token_t *token, char *tmp_buffer, int p_buffer)
-{
-    int len = (p_buffer + 1);
-
-    // allocate memory for token value, copy tmp_buffer to token value
-    // in tmp_buffer there are no more than ECJP_MAX_ITEM_LEN characters
-    token->value = malloc(len);
-    if (token->value == NULL) {
-        ecjp_printf("%s - %d: Memory allocation error for item token value\n", __FUNCTION__,__LINE__);
-        token->value_size = 0;
-        return 0;
-    }   
-    // null terminate the string
-    tmp_buffer[p_buffer] = '\0';
-    token->value_size = len;
-    strncpy(token->value, tmp_buffer, len);
-
-    ecjp_printf("%s - %d: Loaded item token of type %s, size %u, value: %s\n", __FUNCTION__,__LINE__, ecjp_type[token->type], token->value_size, (char *)token->value);
-    return len;
-}
-
-/*
- *  Function: ecjp_reset_tmp_buffer
-    This function reset the temporary buffer for building an item token value.
-    Parameters:
-    - tmp_buffer: The temporary buffer to be reset.
-    - p_buffer: Pointer to the current position in the buffer to be reset.
-*/
-void ecjp_reset_tmp_buffer(char *tmp_buffer, int *p_buffer)
-{
-    memset(tmp_buffer, 0, ECJP_MAX_ITEM_LEN);
-    *p_buffer = 0;
-    return;
-}
-
-/*
- *  Function: ecjp_init_item_token
-    This function initialize an item token structure.
-    Parameters:
-    - token: Pointer to the item token structure to be initialized.
-*/
-void ecjp_init_item_token(ecjp_item_token_t *token)
-{
-    token->type = ECJP_TYPE_UNDEFINED;
-    token->value = NULL;
-    token->value_size = 0;
-    return;
-}
-
-/*
- *  Function: ecjp_free_item_token
-    This function free the memory allocated for an item token structure.
-    Parameters:
-    - token: Pointer to the item token structure to be freed.
-*/
-void ecjp_free_item_token(ecjp_item_token_t *token)
-{
-    if (token->value != NULL) {
-        free(token->value);
-        token->value = NULL;
-    }
-    token->value_size = 0;
-    token->type = ECJP_TYPE_UNDEFINED;
-    return;
-}
-
-/* 
- *  Function: ecjp_free_item_list
-    This function free the memory allocated for a list of item elements.
-    Parameters:
-    - item_list: Pointer to the list of item elements to be freed.
-    Returns:
-    - ECJP_NO_ERROR if the list is freed successfully.
-*/
-ecjp_return_code_t ecjp_free_item_list(ecjp_item_elem_t **item_list)
-{
-    ecjp_item_elem_t *current;
-    ecjp_item_elem_t *next;
-
-    if(item_list == NULL || *item_list == NULL)
-        return ECJP_NO_ERROR;
-        
-    current = *item_list;
-
-    while (current != NULL) {
-        free(current->item.value);
-        next = current->next;
-        free(current);
-        current = next;
-    }
-    *item_list = NULL;
-
-    return ECJP_NO_ERROR;
-}
-
-/* 
- * Function: ecjp_check_and_load_2
-    This function checks the syntax of a JSON-like input string and loads item tokens (values)
-    into a linked list if the syntax is valid.
-    Parameters:
-    - input: The JSON-like input string to be checked and loaded.
-    - item_list: Pointer to a list of item elements loaded with the item tokens found in the input string.
-    - res: Pointer to a structure to store the result of the check, including any error position.
-    Returns:
-    - ECJP_NO_ERROR if the input string is valid.
-    - ECJP_NULL_POINTER if any input pointer is NULL.
-    - ECJP_EMPTY_STRING if the input string is empty.
-    - ECJP_SYNTAX_ERROR if there is a syntax error in the input string.
-*/
-ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **item_list, ecjp_check_result_t *res)
-{
-    ecjp_parser_data_t parser_data;
-    ecjp_parser_data_t *p;
-    ecjp_item_token_t token;
-    char tmp_buffer[ECJP_MAX_ITEM_LEN];
-    int p_buffer = 0;
-
-    memset(tmp_buffer, 0, ECJP_MAX_ITEM_LEN);
-    memset(&token, 0, sizeof(ecjp_item_token_t));
-    memset(&parser_data, 0, sizeof(ecjp_parser_data_t));
-    p =  &parser_data;
-    p->parse_stack.top = -1;
-
-    if ((input == NULL) || (res == NULL)) {
-        ecjp_printf("%s - %d: NULL pointer input/res\n",__FUNCTION__,__LINE__);
-        return ECJP_NULL_POINTER;
-    }
-    if (strlen(input) == 0) {
-        ecjp_printf("%s - %d: Empty string input\n",__FUNCTION__,__LINE__);
-        return ECJP_EMPTY_STRING;
-    }
-#ifdef DEBUG_VERBOSE
-    ecjp_printf("%s - %d:\nInput string: %s\n",__FUNCTION__,__LINE__,input);
-#endif
-
-    p->index = 0;
-    p->flags.all = 0;
-    p->status = ECJP_PS_START;
-    while (input[p->index] != '\0') {
-        // walk through the string
-#ifdef DEBUG_VERBOSE        
-        ecjp_printf("%s - %d: Index %d, Status %d, Char '%c'\n", __FUNCTION__,__LINE__, p->index, p->status, input[p->index]);
-#endif
-        switch (p->status)
-        {
-            case ECJP_PS_START:
-                switch (input[p->index]) {
-                    case ' ':
-                    case '\n':
-                    case '\r':
-                    case '\t':
-                        // skip whitespace
-                        p->index++;
-                        continue;
-
-                    case '{':
-                        p->open_brackets++;
-                        p->num_objects++;
-                        if(ecjp_push_parse_stack(&(p->parse_stack), '{') == ECJP_BOOL_FALSE) {
-                            res->err_pos = p->index;
-                            return ECJP_GENERIC_ERROR;
-                        }   
-                        p->status = ECJP_PS_IN_OBJECT;
-                        res->struct_type = ECJP_ST_OBJ;
-                        break;
-
-                    case '[':
-                        p->open_square_brackets++;
-                        p->num_arrays++;
-                        if(ecjp_push_parse_stack(&(p->parse_stack), '[') == ECJP_BOOL_FALSE) {
-                            res->err_pos = p->index;
-                            return ECJP_GENERIC_ERROR;
-                        }   
-                        p->status = ECJP_PS_IN_ARRAY;
-                        res->struct_type = ECJP_ST_ARRAY;
-                        break;
-
-                    default:
-                        res->err_pos = p->index;
-                        ecjp_printf("%s - %d: Input must start with '{' or ']'\n", __FUNCTION__,__LINE__);
-                        return ECJP_SYNTAX_ERROR;
-                        break;
-                }
-                break;
- 
-            case ECJP_PS_IN_OBJECT:
-                switch (input[p->index]) {
-                    case ' ':
-                    case '\n':
-                    case '\r':
-                    case '\t':
-                        // skip whitespace
-                        p->index++;
-                        continue;
-
-                    case '{':
-                        p->open_brackets++;
-                        p->num_objects++;
-                        if(ecjp_push_parse_stack(&(p->parse_stack), '{') == ECJP_BOOL_FALSE) {
-                            res->err_pos = p->index;
-                            return ECJP_GENERIC_ERROR;
-                        }
-                        p->status = ECJP_PS_IN_OBJECT;
-                        // copy in tmp buffer
-                        if (p_buffer == 0) {
-                            token.type = ECJP_TYPE_OBJECT;
-                        }
-                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
-                        break;  
-
-                    case '}':
-                        p->open_brackets--;
-                        if (p->open_brackets < 0) {
-                            res->err_pos = p->index;
-                            ecjp_printf("%s - %d: Mismatched closing bracket\n", __FUNCTION__,__LINE__);
-                            return ECJP_SYNTAX_ERROR;
-                        }
-                        if (p->flags.trailing_comma) {
-                            res->err_pos = p->index;
-                            ecjp_printf("%s - %d: Trailing comma before closing bracket\n", __FUNCTION__,__LINE__);
-                            return ECJP_SYNTAX_ERROR;
-                        }
-                        if (ecjp_pop_parse_stack(&(p->parse_stack), '{') == ECJP_BOOL_FALSE) {
-                            res->err_pos = p->index;
-                            ecjp_printf("%s - %d: Unexpected closing bracket\n", __FUNCTION__,__LINE__);
-                            return ECJP_SYNTAX_ERROR;
-                        }
-                        if (p->open_brackets == 0 && p->open_square_brackets == 0) {
-                            p->status = ECJP_PS_END;
-                        } else {
-                            p->status = ECJP_PS_WAIT_COMMA;
-                            ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
-                        }
-                        break;
-
-                    case ',':
-                        if (p->flags.trailing_comma) {
-                            res->err_pos = p->index;
-                            ecjp_printf("%s - %d: Multiple trailing commas\n", __FUNCTION__,__LINE__);
-                            return ECJP_SYNTAX_ERROR;
-                        }
-                        p->flags.trailing_comma = 1;
-                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
-                        break;
-
-                    case '"':
-                        p->flags.in_string = 1;
-                        p->status = ECJP_PS_IN_KEY;
-                        p->flags.in_key = 1;
-                        p->flags.trailing_comma = 0;
-                        if (p_buffer == 0) {
-                            token.type = ECJP_TYPE_KEY_VALUE_PAIR;
-                        }
-                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
-                        break;
-                    
-                    default:
-                        res->err_pos = p->index;
-                        ecjp_printf("%s - %d: Expected string key or closing bracket, receive: %c\n", __FUNCTION__,__LINE__,input[p->index]);
-                        return ECJP_SYNTAX_ERROR;
-                        break;  
-                }
-                break;
-            
-            case ECJP_PS_IN_ARRAY:
-                switch (input[p->index]) {
-                    case ' ':
-                    case '\n':
-                    case '\r':
-                    case '\t':
-                        // skip whitespace
-                        p->index++;
-                        continue;
-
-                    case '{':
-                        p->open_brackets++;
-                        p->num_objects++;
-                        if (ecjp_push_parse_stack(&(p->parse_stack), '{') == ECJP_BOOL_FALSE) {
-                            res->err_pos = p->index;
-                            return ECJP_GENERIC_ERROR;
-                        }
-                        p->status = ECJP_PS_IN_OBJECT;
-                        if(p->flags.trailing_comma) {
-                            p->flags.trailing_comma = 0;
-                        }
-                        if (p_buffer == 0) {
-                            token.type = ECJP_TYPE_OBJECT;
-                        }
-                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
-                        break;
-
-                    case '}':
-                        p->open_brackets--;
-                        if (p->open_brackets < 0) {
-                            res->err_pos = p->index;
-                            ecjp_printf("%s - %d: Mismatched closing bracket\n", __FUNCTION__,__LINE__);
-                            return ECJP_SYNTAX_ERROR;
-                        }
-                        if (ecjp_pop_parse_stack(&(p->parse_stack), '{') == ECJP_BOOL_FALSE) {
-                            res->err_pos = p->index;
-                            ecjp_printf("%s - %d: Unexpected closing bracket\n", __FUNCTION__,__LINE__);
-                            return ECJP_SYNTAX_ERROR;
-                        }
-                        p->status = ECJP_PS_WAIT_COMMA;
-                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
-                        break;
-
-                    case '[':
-                        p->open_square_brackets++;
-                        p->num_arrays++;
-                        if (ecjp_push_parse_stack(&(p->parse_stack), '[') == ECJP_BOOL_FALSE) {
-                            res->err_pos = p->index;
-                            return ECJP_GENERIC_ERROR;
-                        }
-                        p->status = ECJP_PS_IN_ARRAY;
-                        if (p->flags.trailing_comma) {
-                            p->flags.trailing_comma = 0;
-                        }
-                        if (p_buffer == 0) {
-                            token.type = ECJP_TYPE_ARRAY;
-                        }
-                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
-                        break;
-
-                    case ']':
-                        p->open_square_brackets--;
-                        if (p->open_square_brackets < 0) {
-                            res->err_pos = p->index;
-                            ecjp_printf("%s - %d: Mismatched closing square bracket\n", __FUNCTION__,__LINE__);
-                            return ECJP_SYNTAX_ERROR;
-                        }
-                        if (ecjp_pop_parse_stack(&(p->parse_stack), '[') == ECJP_BOOL_FALSE) {
-                            res->err_pos = p->index;
-                            ecjp_printf("%s - %d: Unexpected closing square bracket\n", __FUNCTION__,__LINE__);
-                            return ECJP_SYNTAX_ERROR;
-                        }
-                        p->status = ECJP_PS_WAIT_COMMA;
-                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
-                        break;
-                    
-                    case '"':
-                        p->flags.in_string = 1;
-                        p->status = ECJP_PS_IN_VALUE;
-                        if (p->flags.trailing_comma) {
-                            p->flags.trailing_comma = 0;
-                        }
-                        if (p_buffer == 0) {
-                            token.type = ECJP_TYPE_STRING;
-                        }
-                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
-                        break;
-
-                    default:
-                        if (strncmp(&input[p->index], "true", 4) == 0 || strncmp(&input[p->index], "false", 5) == 0 || strncmp(&input[p->index], "null", 4) == 0) {
-                            // valid value
-                            p->status = ECJP_PS_WAIT_COMMA;
-                            if (strncmp(&input[p->index], "true", 4) == 0) {
-                                if (p_buffer == 0) {
-                                    token.type = ECJP_TYPE_BOOL;
-                                }
-                                for (int i = 0; i < 4; i++) {
-                                    ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index + i]);
-                                }
-                            } else if (strncmp(&input[p->index], "false", 5) == 0) {
-                                if (p_buffer == 0) {
-                                    token.type = ECJP_TYPE_BOOL;
-                                }
-                                for (int i = 0; i < 5; i++) {
-                                    ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index + i]);
-                                }
-                            } else {
-                                if (p_buffer == 0) {
-                                    token.type = ECJP_TYPE_NULL;
-                                }
-                                for (int i = 0; i < 4; i++) {
-                                    ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index + i]);
-                                }
-                            }   
-                            p->index += (input[p->index] == 'f') ? 5 : 4; // move index forward
-                            if (p->flags.trailing_comma) {
-                                p->flags.trailing_comma = 0;
-                            }   
-                            continue;
-                        }
-                        if ((input[p->index] >= '0' && input[p->index] <= '9') || input[p->index] == '-') {
-                            // valid value start
-                            p->flags.in_number = 1;
-                            if (p_buffer == 0) {
-                                token.type = ECJP_TYPE_NUMBER;
-                            }
-                            if (input[p->index] == '0') {
-                                p->flags.start_zero = 1;
-                            }
-                            p->status = ECJP_PS_IN_VALUE;
-                            if (p->flags.trailing_comma) {
-                                p->flags.trailing_comma = 0;
-                            }
-                            ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);       
-                        } else {
-                            res->err_pos = p->index;
-                            ecjp_printf("%s - %d: Invalid character in value\n", __FUNCTION__,__LINE__);
-                            return ECJP_SYNTAX_ERROR;
-                        }
-                        break;
-                }
-                break;
-            
-            case ECJP_PS_IN_KEY:
-                // in this status we are always inside a string (p->flags.in_string == 1) 
-                switch (input[p->index]) {
-                    case '\\':
-                        // skip escaped character
-                        p->index++;
-                        switch(input[p->index]) {
-                            case '"':
-                            case '\\':
-                            case '/':
-                            case 'b':
-                            case 'f':
-                            case 'r':
-                            case 'n':
-                            case 't':
-                                p->index++;
-                                continue;
-
-                            case 'u':
-                                if(ecjp_is_excode(input[p->index+1]) &&
-                                   ecjp_is_excode(input[p->index+2]) &&
-                                   ecjp_is_excode(input[p->index+3]) &&
-                                   ecjp_is_excode(input[p->index+4])) {
-                                    for (int i = 0; i < 5; i++) {
-                                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index - 1 + i]);
-                                    }
-                                    p->index += 4;
-                                } else {
-                                    res->err_pos = p->index;
-                                    ecjp_printf("%s - %d: Invalid character in unicode sequence\n", __FUNCTION__,__LINE__);
-                                    return ECJP_SYNTAX_ERROR;
-                                }
-                                break;
-
-                            default:
-                                res->err_pos = p->index;
-                                ecjp_printf("%s - %d: Invalid character in escape sequence (%c)\n", __FUNCTION__,__LINE__, input[p->index]);
-                                return ECJP_SYNTAX_ERROR;
-                                break;
-                        }
-                        break;
-
-                    case '"':
-                        p->flags.in_string = 0;
-                        p->status = ECJP_PS_WAIT_COLON;
-                        p->flags.in_key = 0;
-                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
-                        break;
-
-                    default:
-                        if(ecjp_is_ctrl(input[p->index])) {
-                            res->err_pos = p->index;
-                            ecjp_printf("%s - %d: Invalid control character in key\n", __FUNCTION__,__LINE__);
-                            return ECJP_SYNTAX_ERROR;
-                        } else {
-                            ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
-                        }
-                        break;
-                }
-                break;
-
-            case ECJP_PS_WAIT_COLON:
-                switch (input[p->index]) {
-                    case ' ':
-                    case '\n':
-                    case '\r':
-                    case '\t':
-                        // skip whitespace
-                        p->index++;
-                        continue;
-
-                    case ':':
-                        p->status = ECJP_PS_WAIT_VALUE;
-                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
-                        break;
-
-                    default:
-                        res->err_pos = p->index;
-                        ecjp_printf("%s - %d: Expected colon after key, received: %c\n",__FUNCTION__,__LINE__,input[p->index]);
-                        return ECJP_SYNTAX_ERROR;
-                        break;
-                }
-                break;
-
-            case ECJP_PS_WAIT_VALUE:
-                switch (input[p->index]) {
-                    case ' ':
-                    case '\n':
-                    case '\r':
-                    case '\t':
-                        // skip whitespace
-                        p->index++;
-                        continue;
-
-                    case '{':
-                        p->open_brackets++;
-                        p->num_objects++;
-                        if (ecjp_push_parse_stack(&(p->parse_stack), '{') == ECJP_BOOL_FALSE) {
-                            res->err_pos = p->index;
-                            return ECJP_GENERIC_ERROR;
-                        }
-                        p->status = ECJP_PS_IN_OBJECT;
-                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
-                        break;
-
-                    case '[':
-                        p->open_square_brackets++;
-                        p->num_arrays++;
-                        if (ecjp_push_parse_stack(&(p->parse_stack), '[') == ECJP_BOOL_FALSE) {
-                            res->err_pos = p->index;
-                            return ECJP_GENERIC_ERROR;
-                        }
-                        p->status = ECJP_PS_IN_ARRAY;
-                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
-                        break;
-
-                    case '"':
-                        p->flags.in_string = 1;
-                        p->status = ECJP_PS_IN_VALUE;
-                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
-                        break;
-
-                    default:
-                        if (strncmp(&input[p->index], "true", 4) == 0 || strncmp(&input[p->index], "false", 5) == 0 || strncmp(&input[p->index], "null", 4) == 0) {
-                            // valid value
-                            p->status = ECJP_PS_WAIT_COMMA;
-                            if (strncmp(&input[p->index], "true", 4) == 0) {
-                                for (int i = 0; i < 4; i++) {
-                                    ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index + i]);
-                                }
-                            } else if (strncmp(&input[p->index], "false", 5) == 0) {
-                                for (int i = 0; i < 5; i++) {
-                                    ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index + i]);
-                                }
-                            } else {
-                                for (int i = 0; i < 4; i++) {
-                                    ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index + i]);
-                                }
-                            }
-                            p->index += (input[p->index] == 'f') ? 5 : 4; // move index forward
-                            continue;
-                        }
-                        if ((input[p->index] >= '0' && input[p->index] <= '9') || input[p->index] == '-') {
-                            // valid value start
-                            p->flags.in_number = 1;
-                            if (input[p->index] == '0') {
-                                p->flags.start_zero = 1;
-                            }
-                            p->status = ECJP_PS_IN_VALUE;
-                            ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
-                        } else {
-                            res->err_pos = p->index;
-                            ecjp_printf("%s - %d: Invalid character in value\n", __FUNCTION__,__LINE__);
-                            return ECJP_SYNTAX_ERROR;
-                        }
-                        break;
-                }
-                break;
-
-            case ECJP_PS_IN_VALUE:
-                switch(input[p->index]) {
-                    case '"':
-                        if(!p->flags.in_string) {
-                            res->err_pos = p->index;
-                            ecjp_printf("%s - %d: Unexpected quote in value\n", __FUNCTION__,__LINE__);
-                            return ECJP_SYNTAX_ERROR;
-                        }
-                        p->flags.in_string = 0;
-                        p->status = ECJP_PS_WAIT_COMMA;
-                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
-                        break;
-
-                    default:
-                        if (p->flags.in_string) {
-                            switch (input[p->index]) {
-                                case '\\':
-                                    // skip escaped character
-                                    p->index++;
-                                    switch(input[p->index]) {
-                                        case '"':
-                                        case '\\':
-                                        case '/':
-                                        case 'b':
-                                        case 'f':
-                                        case 'r':
-                                        case 'n':
-                                        case 't':
-                                            p->index++;
-                                            continue;
-
-                                        case 'u':
-                                            if(ecjp_is_excode(input[p->index+1]) &&
-                                               ecjp_is_excode(input[p->index+2]) &&
-                                               ecjp_is_excode(input[p->index+3]) &&
-                                               ecjp_is_excode(input[p->index+4])) {
-                                                for (int i = 0; i < 5; i++) {
-                                                    ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index - 1 + i]);
-                                                }
-                                                p->index += 4;
-                                            } else {
-                                                res->err_pos = p->index;
-                                                ecjp_printf("%s - %d: Invalid character in unicode sequence\n", __FUNCTION__,__LINE__);
-                                                return ECJP_SYNTAX_ERROR;
-                                            }
-                                            break;
-
-                                        default:
-                                            res->err_pos = p->index;
-                                            ecjp_printf("%s - %d: Invalid character in escape sequence (%c)\n", __FUNCTION__,__LINE__, input[p->index]);
-                                            return ECJP_SYNTAX_ERROR;
-                                            break;
-                                    }
-                                    break;
-
-                                default:
-                                    if (ecjp_is_ctrl(input[p->index])) {
-                                        res->err_pos = p->index;
-                                        ecjp_printf("%s - %d: Invalid control character inside value\n", __FUNCTION__,__LINE__);
-                                        return ECJP_SYNTAX_ERROR;
-                                    }
-                                    ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
-                                    break;
-                            }
-                        } else {
-                            switch (input[p->index]) {
-                                case ' ':
-                                case '\n':
-                                case '\r':
-                                case '\t':
-                                    if (p->flags.in_number) {
-                                        p->flags.in_number = 0;
-                                        p->flags.start_zero = 0;
-                                        p->status = ECJP_PS_WAIT_COMMA;
-                                    }
-                                    else {
-                                        // skip whitespace
-                                        p->index++;
-                                        continue;
-                                    }
-                                    break;
-                                
-                                case ',':
-                                    if(p->flags.trailing_comma) {
-                                        res->err_pos = p->index;
-                                        ecjp_printf("%s - %d: Multiple trailing commas\n", __FUNCTION__,__LINE__);
-                                        return ECJP_SYNTAX_ERROR;
-                                    }
-                                    if (p->flags.in_number) {
-                                        p->flags.in_number = 0;
-                                        p->flags.start_zero = 0;
-                                    }
-                                    p->flags.trailing_comma = 1;
-                                    if (ecjp_peek_parse_stack(&(p->parse_stack),'[') == ECJP_BOOL_TRUE) {
-                                        p->status = ECJP_PS_IN_ARRAY;
-                                    } else {
-                                        p->status = ECJP_PS_IN_OBJECT;
-                                    }
-                                    if (ecjp_get_level_parse_stack(&(p->parse_stack)) == 0) {
-                                        if (item_list != NULL)
-                                        {
-                                           res->memory_used += ecjp_load_item(&token, tmp_buffer, p_buffer);
-                                            // Add item token to the list
-                                            if (ecjp_add_node_item_end(item_list, &token) != 0) {
-                                                res->err_pos = p->index;
-                                                ecjp_printf("%s - %d: Failed to add item token to the list\n", __FUNCTION__,__LINE__);
-                                                return ECJP_GENERIC_ERROR;
-                                            } else {
-#ifdef DEBUG_VERBOSE
-                                                ecjp_printf("%s - %d: Added item token to the list, item_list = %p\n", __FUNCTION__,__LINE__, (void *)*item_list);
-#endif
-                                                res->memory_used += sizeof(ecjp_item_elem_t);
-                                                res->num_keys++;
-                                            }
-                                        }
-                                        // Reset token for next item
-                                        ecjp_init_item_token(&token);
-                                        ecjp_reset_tmp_buffer(tmp_buffer, &p_buffer);
-                                    } else {
-                                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
-                                    }
-                                    break;
-                                
-                                case '0':
-                                case '1':
-                                case '2':
-                                case '3':
-                                case '4':
-                                case '5':
-                                case '6':
-                                case '7':
-                                case '8':
-                                case '9':
-                                case '.':
-                                case 'e':
-                                case 'E':
-                                case '+':
-                                case '-':
-                                    if (p->flags.in_number) {
-                                        // valid number continuation
-                                        ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]); 
-                                        if (input[p->index] == '.') {
-                                            if (p->flags.start_zero == 1) {
-                                                p->flags.start_zero = 0;
-                                            }
-                                            break;
-                                        } else {
-                                            if (p->flags.start_zero == 1) {
-                                                // number can start with '0' unless is decimal value
-                                                res->err_pos = p->index;
-                                                ecjp_printf("%s - %d: Number can't start with value 0\n", __FUNCTION__,__LINE__);
-                                                return ECJP_SYNTAX_ERROR;
-                                            }
-                                            break;
-                                        }
-                                    } else {
-                                        res->err_pos = p->index;
-                                        ecjp_printf("%s - %d: Unexpected number character in value\n", __FUNCTION__,__LINE__);
-                                        return ECJP_SYNTAX_ERROR;
-                                    }
-                                    break;
-
-                                case '}':
-                                    if (ecjp_pop_parse_stack(&(p->parse_stack), '{') == ECJP_BOOL_FALSE) {
-                                        res->err_pos = p->index;
-                                        ecjp_printf("%s - %d: Unexpected closing bracket\n", __FUNCTION__,__LINE__);
-                                        return ECJP_SYNTAX_ERROR;
-                                    }
-                                    p->open_brackets--;
-                                    if (p->open_brackets < 0) {
-                                        res->err_pos = p->index;
-                                        ecjp_printf("%s - %d: Mismatched closing bracket\n", __FUNCTION__,__LINE__);
-                                        return ECJP_SYNTAX_ERROR;
-                                    }
-                                    if (p->open_brackets == 0 && p->open_square_brackets == 0) {
-                                        p->status = ECJP_PS_END;
-                                    } else {
-                                        p->status = ECJP_PS_WAIT_COMMA;
-                                    }
-                                    ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
-                                    break;
-
-                                case ']':
-                                    if (ecjp_pop_parse_stack(&(p->parse_stack), '[') == ECJP_BOOL_FALSE) {
-                                        res->err_pos = p->index;
-                                        ecjp_printf("%s - %d: Unexpected closing square bracket\n", __FUNCTION__,__LINE__);
-                                        return ECJP_SYNTAX_ERROR;
-                                    }
-                                    p->open_square_brackets--;
-                                    if (p->open_square_brackets < 0) {
-                                        res->err_pos = p->index;
-                                        ecjp_printf("%s - %d: Mismatched closing square bracket\n", __FUNCTION__,__LINE__);
-                                        return ECJP_SYNTAX_ERROR;
-                                    }
-                                    if (p->open_square_brackets == 0 && p->open_brackets == 0) {
-                                        p->status = ECJP_PS_END;
-                                    } else {
-                                        p->status = ECJP_PS_WAIT_COMMA;
-                                    }
-                                    ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
-                                    break;
-
-                                default:
-                                    res->err_pos = p->index;
-                                    ecjp_printf("%s - %d: Invalid character in value\n", __FUNCTION__,__LINE__);
-                                    return ECJP_SYNTAX_ERROR;
-                                    break;
-                            }
-                        }
-                        break;
-                }
-                break;
-                        
-            case ECJP_PS_WAIT_COMMA:
-                switch (input[p->index]) {
-                    case ' ':
-                    case '\n':
-                    case '\r':
-                    case '\t':
-                        // skip whitespace
-                        p->index++;
-                        continue;
-                    
-                    case '}':
-                        if (p->flags.trailing_comma) {
-                            res->err_pos = p->index;
-                            ecjp_printf("%s - %d: Trailing comma before closing bracket\n", __FUNCTION__,__LINE__);
-                            return ECJP_SYNTAX_ERROR;
-                        }
-                        if (ecjp_get_level_parse_stack(&(p->parse_stack)) > 0) {
-                            ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
-                        }
-                        if (ecjp_get_level_parse_stack(&(p->parse_stack)) == 0) {
-                            if (item_list != NULL)
-                            {
-                                res->memory_used += ecjp_load_item(&token, tmp_buffer, p_buffer);
-                                // Add item token to the list
-                                if (ecjp_add_node_item_end(item_list, &token) != 0) {
-                                    res->err_pos = p->index;
-                                    ecjp_printf("%s - %d: Failed to add item token to the list\n", __FUNCTION__,__LINE__);
-                                    return ECJP_GENERIC_ERROR;
-                                } else {
-#ifdef DEBUG_VERBOSE
-                                    ecjp_printf("%s - %d: Added item token to the list, item_list = %p\n", __FUNCTION__,__LINE__, (void *)*item_list);
-#endif
-                                    res->memory_used += sizeof(ecjp_item_elem_t);
-                                    res->num_keys++;
-                                }
-                            }
-                            // Reset token for next item
-                            ecjp_init_item_token(&token);
-                            ecjp_reset_tmp_buffer(tmp_buffer, &p_buffer);
-                        }
-                        if (ecjp_pop_parse_stack(&(p->parse_stack), '{') == ECJP_BOOL_FALSE) {
-                            res->err_pos = p->index;
-                            ecjp_printf("%s - %d: Unexpected closing bracket\n", __FUNCTION__,__LINE__);
-                            return ECJP_SYNTAX_ERROR;
-                        }
-                        p->open_brackets--;
-                        if (p->open_brackets < 0) {
-                            res->err_pos = p->index;
-                            ecjp_printf("%s - %d: Mismatched closing bracket\n", __FUNCTION__,__LINE__);
-                            return ECJP_SYNTAX_ERROR;
-                        }
-                        if (p->open_brackets == 0 && p->open_square_brackets == 0) {
-                            p->status = ECJP_PS_END;
-                        }
-                        break;
-
-                    case ']':
-                        if (p->flags.trailing_comma) {
-                            res->err_pos = p->index;
-                            ecjp_printf("%s - %d: Trailing comma before closing square bracket\n", __FUNCTION__,__LINE__);
-                            return ECJP_SYNTAX_ERROR;
-                        }
-                        if (ecjp_get_level_parse_stack(&(p->parse_stack)) > 0) {
-                            ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
-                        }
-                        if (ecjp_get_level_parse_stack(&(p->parse_stack)) == 0) {
-                            if (item_list != NULL)
-                            {
-                                res->memory_used += ecjp_load_item(&token, tmp_buffer, p_buffer);
-                                // Add item token to the list
-                                if (ecjp_add_node_item_end(item_list, &token) != 0) {
-                                    res->err_pos = p->index;
-                                    ecjp_printf("%s - %d: Failed to add item token to the list\n", __FUNCTION__,__LINE__);
-                                    return ECJP_GENERIC_ERROR;
-                                } else {
-#ifdef DEBUG_VERBOSE
-                                    ecjp_printf("%s - %d: Added item token to the list, item_list = %p\n", __FUNCTION__,__LINE__, (void *)*item_list);
-#endif
-                                    res->memory_used += sizeof(ecjp_item_elem_t);
-                                    res->num_keys++;
-                                }
-                            }
-                            // Reset token for next item
-                            ecjp_init_item_token(&token);
-                            ecjp_reset_tmp_buffer(tmp_buffer, &p_buffer);
-                        }
-                        if (ecjp_pop_parse_stack(&(p->parse_stack), '[') == ECJP_BOOL_FALSE) {
-                            res->err_pos = p->index;
-                            ecjp_printf("%s - %d: Unexpected closing square bracket\n", __FUNCTION__,__LINE__);
-                            return ECJP_SYNTAX_ERROR;
-                        }
-                        p->open_square_brackets--;
-                        if (p->open_square_brackets < 0) {
-                            res->err_pos = p->index;
-                            ecjp_printf("%s - %d: Mismatched closing square bracket\n", __FUNCTION__,__LINE__);
-                            return ECJP_SYNTAX_ERROR;
-                        }
-                        if (p->open_brackets == 0 && p->open_square_brackets == 0) {
-                            p->status = ECJP_PS_END;
-                        }
-                        break;
-
-                    case ',':
-                        if (p->flags.trailing_comma) {
-                            res->err_pos = p->index;
-                            ecjp_printf("%s - %d: Multiple trailing commas\n", __FUNCTION__,__LINE__);
-                            return ECJP_SYNTAX_ERROR;
-                        }
-                        if (ecjp_get_level_parse_stack(&(p->parse_stack)) > 0) {
-                            ecjp_store_tmp_item(tmp_buffer, &p_buffer, input[p->index]);
-                        }
-                        if (ecjp_get_level_parse_stack(&(p->parse_stack)) == 0) {
-                            if (item_list != NULL)
-                            {
-                                res->memory_used += ecjp_load_item(&token, tmp_buffer, p_buffer);
-                                // Add item token to the list
-                                if (ecjp_add_node_item_end(item_list, &token) != 0) {
-                                    res->err_pos = p->index;
-                                    ecjp_printf("%s - %d: Failed to add item token to the list\n", __FUNCTION__,__LINE__);
-                                    return ECJP_GENERIC_ERROR;
-                                } else {
-#ifdef DEBUG_VERBOSE
-                                    ecjp_printf("%s - %d: Added item token to the list, item_list = %p\n", __FUNCTION__,__LINE__, (void *)*item_list);
-#endif
-                                    res->memory_used += sizeof(ecjp_item_elem_t);
-                                    res->num_keys++;
-                                }
-                            }
-                            // Reset token for next item
-                            ecjp_init_item_token(&token);
-                            ecjp_reset_tmp_buffer(tmp_buffer, &p_buffer);
-                        }
-                        if (ecjp_peek_parse_stack(&(p->parse_stack),'[') == ECJP_BOOL_TRUE) {
-                            p->status = ECJP_PS_IN_ARRAY;
-                        } else {
-                            p->status = ECJP_PS_IN_OBJECT;
-                        }
-                        p->flags.trailing_comma = 1;
-                        break;
-
-                    default:
-                        res->err_pos = p->index;
-                        ecjp_printf("%s - %d: Expected comma after value\n", __FUNCTION__,__LINE__);
-                        return ECJP_SYNTAX_ERROR;
-                        break;
-                }   
-                break;
-        
-            case ECJP_PS_END:
-                // should be only whitespace after end
-                switch (input[p->index]) {
-                    case ' ':
-                    case '\n':
-                    case '\r':
-                    case '\t':
-                        // skip whitespace
-                        p->index++;
-                        continue;
-
-                    default:
-                        res->err_pos = p->index;
-                        ecjp_printf("%s - %d: Unexpected character after end of JSON\n", __FUNCTION__,__LINE__);
-                        return ECJP_SYNTAX_ERROR;
-                }
-                break;
-        
-            default:
-                break;
-        }
-
-        p->index++;
-    }
-
-    if (p->status != ECJP_PS_END) {
-        ecjp_printf("%s - %d: Incomplete JSON structure\n", __FUNCTION__,__LINE__);
-        return ECJP_SYNTAX_ERROR;
-    }
-    if ((p->open_brackets != 0) || (p->open_square_brackets != 0)) {
-        res->err_pos = (p->index - 1);
-        ecjp_printf("%s - %d: Mismatched brackets at end of input\n", __FUNCTION__,__LINE__);
-        return ECJP_BRACKETS_MISSING;
-    }
-
-#ifdef DEBUG_VERBOSE
-    ecjp_print_check_summary(p);
-#endif
-    ecjp_printf("%s - %d: Allocated memory used: %d bytes\n", __FUNCTION__,__LINE__, res->memory_used);
-
-
-    return ECJP_NO_ERROR;
-};
-
-/*
- * Function: ecjp_split_key_and_value()
- * --------------------
- * Splits a key-value pair item into separate key and value strings.
- * Parameters:
- *      item_list: Pointer to the ecjp_item_elem_t containing the key-value pair.
- *      key: Pointer to a char array where the extracted key will be stored.
- *      value: Pointer to a char array where the extracted value will be stored.
- *      leave_quotes: Boolean flag indicating whether to retain quotes around the key.
- * Returns:
- *  ECJP_NO_ERROR on success
- *  ECJP_NULL_POINTER if any input pointer is NULL
- *  ECJP_SYNTAX_ERROR if the item is not a key-value pair
- *  ECJP_NO_SPACE_IN_BUFFER_VALUE if the key or value exceeds maximum length of the buffers
-*/
-ecjp_return_code_t ecjp_split_key_and_value(ecjp_item_elem_t *item_list, char *key, char *value, ecjp_bool_t leave_quotes)
-{
-    int i, j;
-
-    if (item_list == NULL || key == NULL || value == NULL) {
-        return ECJP_NULL_POINTER;
-    }
-
-    if (item_list->item.type != ECJP_TYPE_KEY_VALUE_PAIR) {
-        return ECJP_SYNTAX_ERROR;
-    }
-    for (i = 0; i < item_list->item.value_size && i < ECJP_MAX_KEY_LEN; i++) {
-        if (((char *)item_list->item.value)[i] == ':') {
-            break;
-        }
-        else {
-            if (((char *)item_list->item.value)[i] != '"') {
-                (*key) = ((char *)item_list->item.value)[i];
-                key++;
-            } else {
-                if (leave_quotes) {
-                    (*key) = ((char *)item_list->item.value)[i];
-                    key++;
-                }
-            }
-        }
-    }
-    if (i == ECJP_MAX_KEY_LEN) {
-        return ECJP_NO_SPACE_IN_BUFFER_VALUE;
-    }
-    (*key) = '\0';
-
-    for (j = 0; i < item_list->item.value_size && j < ECJP_MAX_KEY_VALUE_LEN; i++, j++) {
-        if (((char *)item_list->item.value)[i] != ':') {
-            if (((char *)item_list->item.value)[i] != '"') {
-                (*value) = ((char *)item_list->item.value)[i];
-                value++;
-            } else {
-                if (leave_quotes) {
-                    (*value) = ((char *)item_list->item.value)[i];
-                    value++;
-                }
-            }
-        }
-    }
-    if (j == ECJP_MAX_KEY_VALUE_LEN) {
-        return ECJP_NO_SPACE_IN_BUFFER_VALUE;
-    }
-    (*value) = '\0';
-
-    return ECJP_NO_ERROR;
-}
-
-/*
- * Function: ecjp_read_element()
- * --------------------
- * Reads an element from the item list by its index and copies its value to the output structure.
- * Parameters:
- *      item_list: Pointer to the head of the ecjp_item_elem_t linked list.
- *      index: The index of the element to read.
- *      out: Pointer to an ecjp_outdata_t structure where the output will be stored.
- * Returns:
- *  ECJP_NO_ERROR on success
- *  ECJP_NULL_POINTER if item_list or out is NULL
- *  ECJP_INDEX_OUT_OF_BOUNDS if the index is out of bounds
-*/
-ecjp_return_code_t ecjp_read_element(ecjp_item_elem_t *item_list, int index, ecjp_outdata_t *out)
-{
-    int current_index;
-    current_index = 0;
-
-    if (item_list == NULL || out == NULL) {
-        return ECJP_NULL_POINTER;
-    }
-
-    while ((item_list != NULL) && (current_index <= index)) {
-        if (current_index == index) {
-            ecjp_printf("%s - %d: Find element of index %d: Type = %s, Value = %s\n", __FUNCTION__, __LINE__,index, ecjp_type[item_list->item.type], (char *)item_list->item.value);
-            if ((out->value != NULL) && (out->value_size >= item_list->item.value_size)) {
-                memset(out->value, 0, out->value_size);
-                out->type = item_list->item.type;
-                out->value_size = item_list->item.value_size;
-                memcpy(out->value, item_list->item.value, out->value_size);
-            }
-            break;
-        }
-        item_list = item_list->next;
-        current_index++;
-    }
-    if (item_list == NULL) {
-        return ECJP_INDEX_OUT_OF_BOUNDS;
-    }
-
-    return ECJP_NO_ERROR;
-}
-
-/*
- * Function: ecjp_read_key_2()
- * --------------------
- * Reads the value associated with a specified key from the item list, starting from a given index.
- * Parameters:
- *      item_list: Pointer to the head of the ecjp_item_elem_t linked list.
- *      key: The key to search for.
- *      index: The starting index for the search.
- *      out: Pointer to an ecjp_outdata_t structure where the output will be stored.
- * Returns:
- *  ECJP_NO_ERROR on success
- *  ECJP_NULL_POINTER if item_list, key, or out is NULL
- *  ECJP_INDEX_NOT_FOUND if the key is not found in the list
-*/
-ecjp_return_code_t ecjp_read_key_2(ecjp_item_elem_t *item_list, const char *key, unsigned int index, ecjp_outdata_t *out)
-{
-    ecjp_item_elem_t *current_item;
-    int current_index;
-    char extracted_key[ECJP_MAX_KEY_LEN] = {0};
-    char extracted_value[ECJP_MAX_KEY_VALUE_LEN] = {0};
-    ecjp_return_code_t split_res;
-
-    current_index = 0;
-
-    if (item_list == NULL || key == NULL || out == NULL) {
-        return ECJP_NULL_POINTER;
-    }
-#ifdef DEBUG_VERBOSE
-    ecjp_printf("%s - %d: Search for key: %s starting from index %d\n", __FUNCTION__, __LINE__, key, index);
-#endif
-
-    current_item = item_list;
-    while (current_item != NULL) {
-        split_res = ECJP_NO_ERROR;
-        memset(extracted_key, 0, ECJP_MAX_KEY_LEN);
-        memset(extracted_value, 0, ECJP_MAX_KEY_VALUE_LEN);
-
-        if (current_index < index) {
-            current_item = current_item->next;
-            current_index++;
-            continue;
-        }
-        if (current_item->item.type == ECJP_TYPE_KEY_VALUE_PAIR) {
-            split_res = ecjp_split_key_and_value(current_item, extracted_key, extracted_value, ECJP_BOOL_FALSE);
-            if (split_res != ECJP_NO_ERROR) {
-                ecjp_printf("%s - %d: Fail to split key and value pair (res = %d)\n", __FUNCTION__, __LINE__,split_res);
-                return split_res;
-            }
-#ifdef DEBUG_VERBOSE
-            ecjp_printf("%s - %d: extracted_key = %s, extracted_value = %s\n", __FUNCTION__, __LINE__, extracted_key, extracted_value);
-#endif
-            if (strncmp(extracted_key, key, strlen(extracted_key)) == 0) {
-#ifdef DEBUG_VERBOSE
-                ecjp_printf("%s - %d: Found key: %s with value: %s\n", __FUNCTION__, __LINE__, extracted_key, extracted_value);
-#endif
-                if ((out->value != NULL) && (out->value_size >= current_item->item.value_size)) {
-                    memset(out->value, 0, out->value_size);
-                    out->type = current_item->item.type;
-                    out->value_size = strlen(extracted_value) + 1;
-                    memcpy(out->value, extracted_value, out->value_size);
-                    out->last_pos = current_index;
-                    out->error_code = ECJP_NO_ERROR;
-                }
-                return ECJP_NO_ERROR;
-            }
-        }
-        current_item = current_item->next;
-        current_index++;
-    }
-#ifdef DEBUG_VERBOSE
-    ecjp_printf("%s - %d: Fail with error ECJP_INDEX_NOT_FOUND\n", __FUNCTION__, __LINE__);
-#endif
-    return ECJP_INDEX_NOT_FOUND;
-}
-
-
+#endif // ECJP_TOKEN_LIST
 
 /* TO DO: work in progress */
 #if 0

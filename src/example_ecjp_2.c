@@ -44,6 +44,16 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define TEST_KEY_FIND
 
+#ifdef ECJP_TOKEN_LIST
+
+int main(int argc, char *argv[])
+{
+    ecjp_fprint("This example is for key list implementation. Compile without ECJP_TOKEN_LIST defined.\n");
+    return -1;
+}
+
+#else
+
 void usage(char *prog_name)
 {
     ecjp_fprintf("Usage: %s [filename]\n", prog_name);
@@ -186,3 +196,4 @@ int main(int argc, char *argv[])
     return ret;
 }
 
+#endif  // ECJP_TOKEN_LIST 

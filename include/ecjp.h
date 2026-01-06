@@ -52,11 +52,11 @@ typedef uint8_t bool;
 #define false                       0
 #endif
 
-#define DEBUG                       1
+//#define DEBUG                       1
 //#define DEBUG_VERBOSE
 
-#define ECJP_VERSION_MAJOR           0
-#define ECJP_VERSION_MINOR           3
+#define ECJP_VERSION_MAJOR           1
+#define ECJP_VERSION_MINOR           0
 #define ECJP_VERSION_PATCH           0
 
 #define ECJP_ARRAY_NO_INDEX         -1
@@ -217,19 +217,6 @@ typedef struct ecjp_indata {
     ECJP_TYPE_LEN_KEY   length;
 } ecjp_indata_t;
 
-#if 0
-// function prototypes for internal use
-ecjp_bool_t ecjp_is_whitespace(char c);
-ecjp_bool_t ecjp_is_excode(char c);
-ecjp_bool_t ecjp_push_parse_stack(ecjp_parse_stack_item_t *stack, char value);
-ecjp_bool_t ecjp_pop_parse_stack(ecjp_parse_stack_item_t *stack, char expected_value);
-ecjp_bool_t ecjp_peek_parse_stack(ecjp_parse_stack_item_t *stack, char check_value);
-int ecjp_add_node_end(ecjp_key_elem_t **key_list, ecjp_key_token_t *new_key);
-#if DEBUG
-void ecjp_print_check_summary(ecjp_parser_data_t *p);
-#endif
-ecjp_return_code_t ecjp_internal_copy_array_element(char *buffer, unsigned int p_buffer, int index, int num_elements, ecjp_outdata_t *out);
-#endif
 
 extern char *ecjp_type[ECJP_TYPE_MAX_TYPES];
 
@@ -238,6 +225,17 @@ ecjp_return_code_t ecjp_dummy(void);
 ecjp_return_code_t ecjp_get_version(int *major, int *minor, int *patch);
 ecjp_return_code_t ecjp_get_version_string(char *version_string, size_t max_length);
 ecjp_return_code_t ecjp_show_error(const char *input, int err_pos);
+
+#ifdef ECJP_TOKEN_LIST
+// alternative functions using items list
+ecjp_return_code_t ecjp_free_item_list(ecjp_item_elem_t **item_list);
+ecjp_return_code_t ecjp_check_syntax_2(const char *input, ecjp_check_result_t *res);
+ecjp_return_code_t ecjp_load_2(const char *input, ecjp_item_elem_t **item_list, ecjp_check_result_t *res);
+ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **item_list, ecjp_check_result_t *res);
+ecjp_return_code_t ecjp_read_element(ecjp_item_elem_t *item_list, int index, ecjp_outdata_t *out);
+ecjp_return_code_t ecjp_split_key_and_value(ecjp_item_elem_t *item_list, char *key, char *value, ecjp_bool_t leave_quotes);
+ecjp_return_code_t ecjp_read_key_2(ecjp_item_elem_t *item_list, const char *key, unsigned int index, ecjp_outdata_t *out);
+#else
 ecjp_return_code_t ecjp_print_keys(const char *input, ecjp_key_elem_t *key_list);
 ecjp_return_code_t ecjp_free_key_list(ecjp_key_elem_t **key_list);
 ecjp_return_code_t ecjp_get_key(const char input[],char *key,ecjp_key_elem_t **key_list,ECJP_TYPE_POS_KEY start,ecjp_outdata_t *out);
@@ -247,15 +245,8 @@ ecjp_return_code_t ecjp_get_keys_and_value(char *ptr,ecjp_key_elem_t *key_list);
 ecjp_return_code_t ecjp_check_and_load(const char *input, ecjp_key_elem_t **key_list, ecjp_check_result_t *res, unsigned short int level);
 ecjp_return_code_t ecjp_check_syntax(const char *input, ecjp_check_result_t *res);
 ecjp_return_code_t ecjp_load(const char *input, ecjp_key_elem_t **key_list, ecjp_check_result_t *res, unsigned short int level);
+#endif  // ECJP_TOKEN_LIST
 
-// alternative functions using items list
-ecjp_return_code_t ecjp_free_item_list(ecjp_item_elem_t **item_list);
-ecjp_return_code_t ecjp_check_syntax_2(const char *input, ecjp_check_result_t *res);
-ecjp_return_code_t ecjp_load_2(const char *input, ecjp_item_elem_t **item_list, ecjp_check_result_t *res);
-ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **item_list, ecjp_check_result_t *res);
-ecjp_return_code_t ecjp_read_element(ecjp_item_elem_t *item_list, int index, ecjp_outdata_t *out);
-ecjp_return_code_t ecjp_split_key_and_value(ecjp_item_elem_t *item_list, char *key, char *value, ecjp_bool_t leave_quotes);
-ecjp_return_code_t ecjp_read_key_2(ecjp_item_elem_t *item_list, const char *key, unsigned int index, ecjp_outdata_t *out);
 
 #ifdef __cplusplus
 }

@@ -44,6 +44,8 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #define TEST_KEY_FIND
 
+#ifdef ECJP_TOKEN_LIST
+
 void usage(char *prog_name)
 {
     ecjp_fprintf("Usage: %s [filename]\n", prog_name);
@@ -154,6 +156,8 @@ int main(int argc, char *argv[])
                                 index++;
                             } while (1);
                             // random access example
+                            ecjp_fprint("Example of random access:\n");
+
                             out.value_size = ECJP_MAX_ITEM_LEN;
                             memset(out.value, 0, ECJP_MAX_ITEM_LEN);
                             ecjp_read_element(item_list, 0, &out);
@@ -215,4 +219,14 @@ int main(int argc, char *argv[])
 
     return ret;
 }
+
+#else
+
+int main(int argc, char *argv[])
+{
+    ecjp_fprint("This example is for token list implementation. Compile with ECJP_TOKEN_LIST defined.\n");
+    return -1;
+}
+
+#endif // ECJP_TOKEN_LIST 
 
