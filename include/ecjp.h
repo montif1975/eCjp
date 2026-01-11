@@ -223,7 +223,7 @@ extern char *ecjp_type[ECJP_TYPE_MAX_TYPES];
 // Function declarations (public API)
 ecjp_return_code_t ecjp_dummy(void);
 ecjp_return_code_t ecjp_get_version(int *major, int *minor, int *patch);
-ecjp_return_code_t ecjp_get_version_string(char *version_string, size_t max_length);
+ecjp_return_code_t ecjp_get_version_string(char *version_string, int max_length);
 ecjp_return_code_t ecjp_show_error(const char *input, int err_pos);
 
 #ifdef ECJP_TOKEN_LIST

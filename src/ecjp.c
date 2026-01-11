@@ -302,7 +302,7 @@ ecjp_return_code_t ecjp_get_version(int *major, int *minor, int *patch)
         - ECJP_NO_ERROR on success.
         - ECJP_NULL_POINTER if version_string is NULL or max_length is 0.
 */
-ecjp_return_code_t ecjp_get_version_string(char *version_string, size_t max_length)
+ecjp_return_code_t ecjp_get_version_string(char *version_string, int max_length)
 {
     if (version_string == NULL || max_length == 0) {
         return ECJP_NULL_POINTER;

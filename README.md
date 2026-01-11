@@ -75,14 +75,14 @@ The library files are only the following:
 After downloading the source code, run the following commands:
 
 ```sh
-autoreconf -i
-cd build
+$ autoreconf -i
+$ cd build
 ```
 
 The available build options can be displayed by running:
 
 ```sh
-../configure -h
+$ ../configure -h
 ```
 
 The library-specific options are:
@@ -98,7 +98,7 @@ The library-specific options are:
 The effect of each option is described in the following table:
 
 | OPTION | DESCRIPTION |
-|-------|-------------|
+|--------|-------------|
 | --enable-debug | enable DEBUG print on stdout |
 | --enable-debug-verbose | enable VERBOSE print on stdout |
 | --enable-token-list | compile token-list version of the library |
@@ -111,8 +111,8 @@ Moreover, with this option enabled, the *debug* and *debug-verbose* options have
 Example of compilation for PC using the token-based implementation:
 
 ```sh
-../configure --enable-debug --enable-token-list --enable-run-on-pc
-make
+$ ../configure --enable-debug --enable-token-list --enable-run-on-pc
+$ make
 ```
 
 The compilation produces:
@@ -126,23 +126,128 @@ Some example and test programs work depending on the build configuration: if the
 ## API
 
 The library provides a set of APIs that together allow parsing JSON structures of relatively high complexity.  
-**At the moment, this section describes the functions of the implementation enabled by the *token-list* option, which tokenizes the JSON structure.**
+
+### ecjp_dummy()  
+
+`ecjp_return_code_t ecjp_dummy(void)`  
+
+A simple dummy function to test library linkage.
+
+No Parameters.
+
+Returns:  
+- ECJP_NO_ERROR on success.
+
+Example:
+```c
+  ecjp_return_code_t ret = 0; 
+  
+  ret = ecjp_dummy();
+  if (ret != ECJP_NO_ERROR) {
+      printf("ecjp_dummy() failed with error code: %d\n", ret);
+      printf("Unable to load library?\n");
+  }
+  else {
+      printf("ecjp_dummy() succeeded.\n");
+  }
+```
+
+### ecjp_get_version()  
+
+`ecjp_return_code_t ecjp_get_version(int *major, int *minor, int *patch)`  
+
+This function retrieves the version of the eCjp library. It stores the major, minor and patch in the three pointer passed as arguments.
+
+Parameters:  
+- major: Pointer to an integer to store the major version number.  
+- minor: Pointer to an integer to store the minor version number.  
+- patch: Pointer to an integer to store the patch version number.  
+
+Returns:  
+- ECJP_NO_ERROR on success.  
+
+Example:  
+```c
+  int major, minor, patch;
+  ecjp_return_code_t ret;
+  
+  ret = 0;
+  major = minor = patch = 0;
+
+  ret = ecjp_get_version(&major, &minor, &patch);
+  if (ret != ECJP_NO_ERROR) {
+      printf("ecjp_get_version() failed with error code: %d\n", ret);
+  }
+  else {
+      printf("ecjp_get_version() succeeded. Version: %d.%d.%d\n", major, minor, patch);
+  }
+```
+
+### ecjp_get_version_string()  
+
+`ecjp_return_code_t ecjp_get_version_string(char *version_string, int max_length)`  
+
+This function retrieves the version of the eCjp library as a string.  
+
+Parameters:  
+- version_string: Pointer to a character array to store the version string.  
+- max_length: Maximum length of the version string buffer.  
+
+Returns:  
+- ECJP_NO_ERROR on success.
+- ECJP_NULL_POINTER if version_string is NULL or max_length is 0.
+
+Example:  
+```c
+  char version_string[16];
+  ecjp_return_code_t ret;
+  
+  ret = 0;
+  memset(version_string, 0, sizeof(version_string));
+
+  ret = ecjp_get_version_string(version_string, sizeof(version_string));
+  if (ret != ECJP_NO_ERROR) {
+      printf("ecjp_get_version_string() failed with error code: %d\n", ret);
+  }
+  else {
+      printf("ecjp_get_version_string() succeeded. Version string: %s\n", version_string);
+  }
+```
+
+### ecjp_show_error()  
+
+`ecjp_return_code_t ecjp_show_error(const char *input, int err_pos)`  
+
+This function displays the input string with an indicator pointing to the error position.  
+The function formats the output in ECJP_MAX_PRINT_COLUMNS colums (defined in *ecjp_limit.h*). 
+
+Parameters:  
+- input: The JSON-like input string.  
+- err_pos: The position of the error in the input string.  
+
+Returns:  
+- ECJP_NO_ERROR on success.
+
+Example:
+```c
+ecjp_return_code_t ret = ECJP_NO_ERROR;
+ecjp_check_result_t results;
+char *ptr; // pointer to the JSON-like input string
+
+ret = ecjp_check_syntax_2(ptr,&results);
+if (ret != ECJP_NO_ERROR) {
+    printf("ecjp_check_syntax_2() on JSON file: FAILED with error code: %d\n", ret);
+    if (results.err_pos >= 0) {
+        printf("ecjp_check_syntax_2(): Error position: %d\n", results.err_pos);
+        ecjp_show_error(ptr, results.err_pos);
+    }
+}
+```  
+
+**At the moment, this following part describes the functions of the implementation enabled by the *token-list* option, which tokenizes the JSON structure.**
 
 ### ecjp_check_syntax_2()
-La funzione **ecjp_check_syntax_2()** permette di verificare la correttezza sintattica di una struttura JSON passata come argomento.  
-Quando compilata per CPU, la funzione restituisce in output la posizione nella struttura JSON del primo errore, ad esempio:  
-``` sh
-Testing input file: ../../tests/invalid_15_missing_quote_in_key.json
 
-Testing JSON file (../../tests/invalid_15_missing_quote_in_key.json) of size 35 bytes:
-ecjp_check_and_load_2 - 938: Expected colon after key, received: V
-ecjp_check_syntax_2() on JSON file: FAILED with error code: 3
-ecjp_check_syntax_2(): Error position: 27
-ecjp_show_error - 350: Error at position 27 (row 1, column 28):
-{ "KEY1": "VAL1", "KEY_2: "VAL2" } 
----------------------------^
-
-```  
 `ecjp_return_code_t ecjp_check_syntax_2(const char *input, ecjp_check_result_t *res)`
 
 This function call ecjp_check_and_load_2() without pointer to store the items to perform only syntax checking.  
@@ -157,8 +262,21 @@ Returns:
 - ECJP_EMPTY_STRING if the input string is empty.
 - ECJP_SYNTAX_ERROR if there is a syntax error in the input string.  
 
-La struttura puntata da *res* contiene i seguenti campi:
-```
+The **ecjp_check_syntax_2()** function checks the syntactical correctness of a JSON structure passed as an argument.
+The function outputs the position of the first error in the JSON structure in the *res->err_pos* parameter. This value can be passed to the *ecjp_show_error()* function to print the error in the context of the parsed JSON string. For example: 
+``` sh
+Testing input file: ../../tests/invalid_15_missing_quote_in_key.json
+
+Testing JSON file (../../tests/invalid_15_missing_quote_in_key.json) of size 35 bytes:
+ecjp_check_and_load_2 - 938: Expected colon after key, received: V
+ecjp_check_syntax_2() on JSON file: FAILED with error code: 3
+ecjp_check_syntax_2(): Error position: 27
+ecjp_show_error - 350: Error at position 27 (row 1, column 28):
+{ "KEY1": "VAL1", "KEY_2: "VAL2" } 
+---------------------------^
+```  
+The structure pointed by *res* contains the following fields:
+```c
 typedef struct ecjp_check_result {
     int                 err_pos;
     ECJP_TYPE_POS_KEY   num_keys;
@@ -166,9 +284,28 @@ typedef struct ecjp_check_result {
     int                 memory_used;
 } ecjp_check_result_t;
 ```
-e la funzione torna il tipo di struttura JSON analizzata nel campo *struct_type*: ECJP_ST_OBJ per un oggetto, ECJP_ST_ARRAY per un array.  
+and the function returns the type of the parsed JSON structure in the field *struct_type*: ECJP_ST_OBJ for an object, ECJP_ST_ARRAY for an array. 
 
-### ecjp_load_2()
+Example:  
+```c
+ecjp_return_code_t ret = ECJP_NO_ERROR;
+ecjp_check_result_t results;
+char *ptr; // pointer to the JSON-like input string
+
+ret = ecjp_check_syntax_2(ptr,&results);
+if (ret != ECJP_NO_ERROR) {
+    printf("ecjp_check_syntax_2() on JSON file: FAILED with error code: %d\n", ret);
+    if (results.err_pos >= 0) {
+        printf("ecjp_check_syntax_2(): Error position: %d\n", results.err_pos);
+        ecjp_show_error(ptr, results.err_pos);
+    }
+} else {
+  printf("ecjp_check_syntax_2() on JSON file: SUCCEEDED\n");
+}
+```
+
+### ecjp_load_2()  
+
 `ecjp_return_code_t ecjp_load_2(const char *input, ecjp_item_elem_t **item_list, ecjp_check_result_t *res)`
 
 This function call ecjp_check_and_load_2() with pointer to store the items. Perform syntax checking and store all items found in the input string at the first level of the structure.  
@@ -184,13 +321,30 @@ Returns:
 - ECJP_EMPTY_STRING if the input string is empty.
 - ECJP_SYNTAX_ERROR if there is a syntax error in the input string.
 
-La funzione alloca tanti *ecjp_item_elem_t* per quanti elementi trova al primo livello della struttura JSON.  
-Se il JSON è un oggetto, gli item sono le coppie chiave-valore, se il JSON è un array gli item sono gli elementi dell'array e per ciascuno di essi viene specificato il suo tipo.  
-**Ogni item, sia che si tratti di una coppia chiave-valore, sia che si tratti di un elemento di un array, viene salvato come stringa**.  
-La funzione chiamante, quando non ne ha più bisogno, deve liberare la memoria allocata chiamando la funzione *ecjp_free_item_list()*.  
-Nella struttura puntata da *res* c'è il campo *memory_used* che contiene il totale in bytes della memoria allocata nel parsing.  
+The function allocates as many *ecjp_item_elem_t* as there are elements at the first level of the JSON structure.
+If the JSON is an object, the items are the key-value pairs; if the JSON is an array, the items are the array elements, and each element's type is specified.
+**Each item, whether a key-value pair or an array element, is saved as a string**.
+When the calling function no longer needs it, it must free the allocated memory by calling the *ecjp_free_item_list()* function.
+In the structure pointed to by *res*, there is the *memory_used* field, which contains the total memory allocated in bytes in the *item_list*.
 
-### ecjp_check_and_load_2()
+Example:  
+```c
+ecjp_return_code_t ret = ECJP_NO_ERROR;
+ecjp_check_result_t results;
+char *ptr; // pointer to the JSON-like input string
+ecjp_item_elem_t *item_list = NULL;
+
+ret = ecjp_load_2(ptr,&item_list,&results);
+if (ret != ECJP_NO_ERROR) {
+    printf("ecjp_load_2() on JSON file: FAILED with error code: %d\n", ret);
+    ecjp_free_item_list(&item_list);
+} else {
+    printf("ecjp_load_2() on JSON file: SUCCEEDED\n");
+}
+```
+
+### ecjp_check_and_load_2()  
+
 `ecjp_return_code_t ecjp_check_and_load_2(const char *input, ecjp_item_elem_t **item_list, ecjp_check_result_t *res)`  
 
 This function checks the syntax of a JSON-like input string and loads item tokens into a linked list if the syntax is valid.  
@@ -206,9 +360,27 @@ Returns:
 - ECJP_EMPTY_STRING if the input string is empty.
 - ECJP_SYNTAX_ERROR if there is a syntax error in the input string.
 
-Se la struttura JSON passata in *input* ha delle chiavi duplicate (anche se non è una buona pratica), la funzione *ecjp_load_2()* o *ecjp_check_and_load_2()* le carica ugualmente tutte in item diversi. 
+If the JSON structure passed in *input* has duplicate keys (although this is not a good practice), the *ecjp_load_2()* or *ecjp_check_and_load_2()* function loads them all into different items anyway.  
+The user code can use *ecjp_load_2()*, no need to use this function directly but it's possible as described in the example.
 
-### ecjp_free_item_list()
+Example:
+```c
+ecjp_return_code_t ret = ECJP_NO_ERROR;
+ecjp_check_result_t results;
+char *ptr; // pointer to the JSON-like input string
+ecjp_item_elem_t *item_list = NULL;
+
+ret = ecjp_check_and_load_2(ptr,&item_list,&results);
+if (ret != ECJP_NO_ERROR) {
+    printf("ecjp_check_and_load_2() on JSON file: FAILED with error code: %d\n", ret);
+    ecjp_free_item_list(&item_list);
+} else {
+    printf("ecjp_check_and_load_2() on JSON file: SUCCEEDED\n");
+}
+```
+
+### ecjp_free_item_list()  
+
 `ecjp_return_code_t ecjp_free_item_list(ecjp_item_elem_t **item_list)`  
 
 This function free the memory allocated for a list of item elements.  
@@ -219,7 +391,26 @@ Parameters:
 Returns:
 - ECJP_NO_ERROR if the list is freed successfully.
 
-### ecjp_read_element()
+Example:  
+```c
+ecjp_return_code_t ret = ECJP_NO_ERROR;
+ecjp_check_result_t results;
+char *ptr; // pointer to the JSON-like input string
+ecjp_item_elem_t *item_list = NULL;
+
+ret = ecjp_load_2(ptr,&item_list,&results);
+if (ret != ECJP_NO_ERROR) {
+    printf("ecjp_load_2() on JSON file: FAILED with error code: %d\n", ret);
+} else {
+    printf("ecjp_load_2() on JSON file: SUCCEEDED\n");
+
+    // ...ELABORATION...
+}
+ecjp_free_item_list(&item_list);  
+```
+
+### ecjp_read_element()  
+
 `ecjp_return_code_t ecjp_read_element(ecjp_item_elem_t *item_list, int index, ecjp_outdata_t *out)`  
 
 This function reads an element from the item list by its index and copies its value to the output structure.  
@@ -232,10 +423,10 @@ Parameters:
 Returns:
 - ECJP_NO_ERROR on success
 - ECJP_NULL_POINTER if item_list or out is NULL
-- ECJP_INDEX_OUT_OF_BOUNDS if the index is out of bounds
+- ECJP_INDEX_OUT_OF_BOUNDS if the index is out of bounds (no more items in the list)
 
-La struttura puntata da *out* contiene i seguenti campi:  
-```
+The structure pointed by *out* contains the following fields:   
+```c
 typedef struct ecjp_outdata {
     ecjp_return_code_t  error_code;
     ECJP_TYPE_POS_KEY   last_pos;
@@ -245,14 +436,58 @@ typedef struct ecjp_outdata {
     unsigned int        value_size;
 } ecjp_outdata_t;
 ```  
-Il campo *value* al momento è volutamente un puntatore a *void* ma la funzione copia la stringa che contiene l'item.  
-Se la struttura JSON originale era un oggetto, dentro value sarà memorizzata una coppia chiave-valore, se era un array, sarà memorizzato l'elemento dell'array di indice *index*.
 
+The *value* field is currently intentionally a pointer to *void*, but the function copies the string containing the item.
+If the original JSON structure was an object, a key-value pair will be stored inside value; if it was an array, the element of the index array *index* will be stored.  
 
-### ecjp_split_key_and_value()
+Example:
+```c
+  ecjp_outdata_t out;
+  char key[ECJP_MAX_KEY_LEN];
+  char value[ECJP_MAX_KEY_VALUE_LEN];
+  int index = 0;
+
+  memset(&out, 0, sizeof(ecjp_outdata_t));
+  out.value = malloc(ECJP_MAX_ITEM_LEN);
+  // scan all the item list
+  do {
+      out.value_size = ECJP_MAX_ITEM_LEN;
+      memset(out.value, 0, ECJP_MAX_ITEM_LEN);
+      if(ecjp_read_element(item_list, index, &out) == ECJP_NO_ERROR) {
+          if (out.type == ECJP_TYPE_KEY_VALUE_PAIR) {
+              // parse key-value pair
+              memset(key, 0, sizeof(key));
+              memset(value, 0, sizeof(value));
+              sscanf((char *)out.value, "%[^:]:%[^\n]", key, value);
+              printf("  Key = '%s', Value = '%s'\n", key, value);
+          }
+      }
+      else {
+          break;
+      }
+      index++;
+  } while (1);
+
+  // random access example
+  ecjp_fprint("Example of random access:\n");
+
+  out.value_size = ECJP_MAX_ITEM_LEN;
+  memset(out.value, 0, ECJP_MAX_ITEM_LEN);
+  // read element of index=0
+  ecjp_read_element(item_list, 0, &out);
+
+  // read element of index=1
+  out.value_size = ECJP_MAX_ITEM_LEN;
+  memset(out.value, 0, ECJP_MAX_ITEM_LEN);
+  ecjp_read_element(item_list, 1, &out);  
+```  
+
+### ecjp_split_key_and_value()  
+
 `ecjp_return_code_t ecjp_split_key_and_value(ecjp_item_elem_t *item_list, char *key, char *value, ecjp_bool_t leave_quotes)`  
 
 This function splits a key-value pair item into separate key and value strings.  
+This feature is only useful if you are compiling for MCU and you cannot use the function `sscanf((char *)out.value, "%[^:]:%[^\n]", key, value)`.
 
 Parameters:
 - item_list: Pointer to the ecjp_item_elem_t containing the key-value pair.
@@ -266,10 +501,28 @@ Returns:
 - ECJP_SYNTAX_ERROR if the item is not a key-value pair
 - ECJP_NO_SPACE_IN_BUFFER_VALUE if the key or value exceeds maximum length of the buffers  
 
-Questa funzione permette di separare una coppia chiave-valore in due strighe separate.  
-Se l'item non contiene una coppia chiave-valore viene restituito un errore.  
+This function allows you to separate a key-value pair into two separate strings.  
+If the item does not contain a key-value pair, an error is returned.  
 
-### ecjp_read_key_2()
+Example:  
+```c
+  ecjp_item_elem_t *current_item;
+  char extracted_key[ECJP_MAX_KEY_LEN];
+  char extracted_value[ECJP_MAX_KEY_VALUE_LEN];
+  ecjp_return_code_t split_res = ECJP_NO_ERROR;
+
+  if (current_item->item.type == ECJP_TYPE_KEY_VALUE_PAIR) {
+      split_res = ecjp_split_key_and_value(current_item, extracted_key, extracted_value, ECJP_BOOL_FALSE);
+      if (split_res != ECJP_NO_ERROR) {
+          printf("Fail to split key and value pair (res = %d)\n", split_res);
+          return split_res;
+      }
+      printf("extracted_key = %s, extracted_value = %s\n", extracted_key, extracted_value);
+  }  
+```
+
+### ecjp_read_key_2()  
+
 `ecjp_return_code_t ecjp_read_key_2(ecjp_item_elem_t *item_list, const char *key, unsigned int index, ecjp_outdata_t *out)`  
 
 This function reads the value associated with a specified key from the item list, starting from a given index.  
@@ -285,15 +538,76 @@ Returns:
 - ECJP_NULL_POINTER if item_list, key, or out is NULL
 - ECJP_INDEX_NOT_FOUND if the key is not found in the list
 
-Questa funzione cerca la chiave *key* dentro la lista di item partendo dall'indice specificato da *index* e controllando solo gli item di tipo chiave-valore.  
-La funzione torna nella struttura puntata da *out*, nel campo *last_pos*, la posizione nella lista in cui ha trovato la chiave: questo permette di invocare di nuovo la funzione con *index=last_pos* per continuare a scorrere la lista cercando eventuali chiavi duplicate.  
-Quando la funzione torna ECJP_INDEX_NOT_FOUND vuol dire che ha completato la lista senza trovare la chiave (o altre chiavi). 
+This function searches for the key *key* within the list of items, starting at the index specified by *index* and checking only for key-value items.  
+The function returns the position in the list where it found the key in the structure pointed to by *out*, in the *last_pos* field. This allows the function to be called again with *index=last_pos + 1* to continue scanning the list for duplicate keys.  
+When the function returns ECJP_INDEX_NOT_FOUND, it has completed the list without finding the key (or other keys).  
 
-## Examples
+Example:
+```c
+  char search_key[] = "KEY_1";
+  ecjp_outdata_t out;
+  int index = 0;
 
-## Tests
+  memset(&out, 0, sizeof(ecjp_outdata_t));
+  out.value = malloc(ECJP_MAX_ITEM_LEN);
+  do {
+      out.value_size = ECJP_MAX_ITEM_LEN;
+      memset(out.value, 0, ECJP_MAX_ITEM_LEN);
+      out.length = 0;
+      out.last_pos = 0;
 
-## Remarks
+      if(ecjp_read_key_2(item_list, search_key, index, &out) == ECJP_NO_ERROR) {
+          printf("  Key = '%s', Value = '%s'\n", search_key, (char *)out.value);
+      }
+      else {
+          break;
+      }
+      index = out.last_pos + 1;
+  } while (1);  
+```  
+
+## Examples  
+
+The folder *src* contains a lot of test and example programs that are described in the table.  
+
+|       PROGRAM         | USED TO TEST                                  | TOKEN-LIST IMPLEMENTATION | KEY-POSITION IMPLEMENTATION |
+|-----------------------|-----------------------------------------------|---------------------------|-----------------------------|
+|test_lib_load (*)      | ecjp_dummy()                                  |             X             |               X             |
+|test_lib_version (*)   | ecjp_get_version(), ecjp_get_version_string() |             X             |               X             |
+|test_lib_check_syntax  | ecjp_check_syntax_2(),ecjp_show_error()       |             X             |               -             |
+|test_lib_check_and_load| ecjp_check_and_load(), ecjp_free_key_list()   |             -             |               X             |
+|test_lib_read_array    | ecjp_check_and_load(), read_single_array_element()|         -             |               X             |
+|test_lib_get_key       | ecjp_load_2(), ecjp_read_key_2(), ecjp_free_item_list()|    X             |               -             |
+|example_ecjp_1         | complete parsing                              |             -             |               X             |
+|example_ecjp_2         | complete parsing                              |             -             |               X             |
+|example_ecjp_3         | complete parsing                              |             X             |               -             |
+
+(*) no input required  
+To execute the program that require argument, I prepared a lot of file with different JSON inside; they are in *tests* folder.  
+Some of them are *invalid* JSON to test the check syntax algorithm: the file name explain the type of JSON that it contains. 
+
+## Tests  
+
+The two batch script inside the *scripts* folder can be used to perform test in very quick way.  
+To use the *example_ecjp_3* program it's enough to launch the script *run_test.sh*:  
+```sh
+$ cd scripts
+$ ./run_test.sh
+```
+The script launches the program *example_ecjp_3* with each of the files in the *tests* folder as an argument and print the result: PASS or FAIL.  
+To change the program to lauch, change the script *run_test.sh*.  
+
+## Remarks  
+
+At the moment there are these TODOS:
+- the compilation process produce library and executables with debug symbols, no stripped. I need to add RELEASE compilation.
+- the test *valid_11_deep_nesting.json* pass only with compilation for CPU due the limit of MCU parsing.
+- the test *valid_03_unicode.json* pass but the parsing fail the value of key "escaped" missing the characters "\n" e "\t" inside the string value.
+- the test *valid_08_escaped_unicode.json* pass but the parsing of the value of the keys "escapedQuotes" and "slashes" are not correct. Need to be fixed.  
+
+
+
+
 
 
 
