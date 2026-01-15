@@ -1,50 +1,50 @@
 #!/bin/bash
 
-# Uso: ./test_all.sh <programma> <cartella>
-# Esempio: ./test_all.sh ./mio_programma ./test_files
+# Usage: ./test_all.sh <program> <folder>
+# Example: ./test_all.sh ./my_program ./test_files
 
 PROGRAMMA="$1"
 CARTELLA="$2"
 
-# Colori ANSI
-VERDE="\e[32m"
-ROSSO="\e[31m"
+# ANSI colors
+GREEN="\e[32m"
+RED="\e[31m"
 RESET="\e[0m"
 
-# test possibili
+# possible tests
 PREF_VALID="valid_"
 PREF_INVALID="invalid_"
 
-# Controllo parametri
+# Parameter check
 if [ -z "$PROGRAMMA" ] || [ -z "$CARTELLA" ]; then
-    echo "Uso: $0 <programma> <cartella>"
+    echo "Usage: $0 <program> <folder>"
     exit 1
 fi
 
 if [ ! -x "$PROGRAMMA" ]; then
-    echo "Errore: $PROGRAMMA non è eseguibile!"
+    echo "Error: $PROGRAMMA is not executable!"
     exit 1
 fi
 
 if [ ! -d "$CARTELLA" ]; then
-    echo "Errore: $CARTELLA non è una cartella valida!"
+    echo "Error: $CARTELLA is not a valid folder!"
     exit 1
 fi
 
-# Scorri tutti i file nella cartella
+# Scroll through all files in the folder
 for FILE in "$CARTELLA"/*; do
     if [ -f "$FILE" ]; then
-        echo -n "Eseguo $PROGRAMMA con $FILE ... "
+        echo -n "Running $PROGRAMMA with $FILE ... "
         "$PROGRAMMA" "$FILE" 2>/dev/null 1>/dev/null
         RET=$?
         NOME_FILE=$(basename "$FILE")
         if [[ $RET -eq 0 && $NOME_FILE == ${PREF_VALID}* ]]; then
-            echo -e "${VERDE}[PASS]${RESET}"
+            echo -e "${GREEN}[PASS]${RESET}"
         else
             if [[ $RET -eq 255 && $NOME_FILE == ${PREF_INVALID}* ]]; then
-                echo -e "${VERDE}[PASS]${RESET}"
+                echo -e "${GREEN}[PASS]${RESET}"
             else
-                echo -e "${ROSSO}[FAIL]${RESET} (codice $RET)"
+                echo -e "${RED}[FAIL]${RESET} (code $RET)"
             fi
         fi
     fi

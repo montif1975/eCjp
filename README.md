@@ -572,8 +572,8 @@ The folder *src* contains a lot of test and example programs that are described 
 
 |       PROGRAM         | USED TO TEST                                  | TOKEN-LIST IMPLEMENTATION | KEY-POSITION IMPLEMENTATION |
 |-----------------------|-----------------------------------------------|---------------------------|-----------------------------|
-|test_lib_load (*)      | ecjp_dummy()                                  |             X             |               X             |
-|test_lib_version (*)   | ecjp_get_version(), ecjp_get_version_string() |             X             |               X             |
+|test_lib_load (1)      | ecjp_dummy()                                  |             X             |               X             |
+|test_lib_version (1)   | ecjp_get_version(), ecjp_get_version_string() |             X             |               X             |
 |test_lib_check_syntax  | ecjp_check_syntax_2(),ecjp_show_error()       |             X             |               -             |
 |test_lib_check_and_load| ecjp_check_and_load(), ecjp_free_key_list()   |             -             |               X             |
 |test_lib_read_array    | ecjp_check_and_load(), read_single_array_element()|         -             |               X             |
@@ -581,10 +581,62 @@ The folder *src* contains a lot of test and example programs that are described 
 |example_ecjp_1         | complete parsing                              |             -             |               X             |
 |example_ecjp_2         | complete parsing                              |             -             |               X             |
 |example_ecjp_3         | complete parsing                              |             X             |               -             |
+|example_ecjp_4 (2)     | complete parsing                              |             X             |               -             |
 
-(*) no input required  
+(1) no input required  
+(2) to be used with test valid_24_db_example.json  
+
 To execute the program that require argument, I prepared a lot of file with different JSON inside; they are in *tests* folder.  
-Some of them are *invalid* JSON to test the check syntax algorithm: the file name explain the type of JSON that it contains. 
+Some of them are *invalid* JSON to test the check syntax algorithm: the file name explain the type of JSON that it contains.  
+
+When running on PC the output of the example_ecjp_X is like this:  
+```sh
+$ ./example_ecjp_4 ../../tests/valid_24_db_example.json 
+
+Using eCjp version: 1.0.0
+
+Using input file: ../../tests/valid_24_db_example.json
+
+Using JSON file (../../tests/valid_24_db_example.json) of size 897 bytes:
+ecjp_check_and_load_2 - 1418: Allocated memory used: 0 bytes
+ecjp_check_syntax() on JSON file: SUCCEEDED.
+ecjp_load_item - 432: Loaded item token of type OBJECT, size 102, value: {"Name":"Giuseppe","Surname":"Garibaldi","Age":48,"Address":"Via Roma 1","City":"Roma","Zip":"00118"}
+ecjp_load_item - 432: Loaded item token of type OBJECT, size 109, value: {"Name":"Leonardo","Surname":"Da Vinci","Age":35,"Address":"Via Nazionale 21","City":"Milano","Zip":"20121"}
+ecjp_load_item - 432: Loaded item token of type OBJECT, size 106, value: {"Name":"Galileo","Surname":"Galilei","Age":78,"Address":"Piazza Dante 6","City":"Firenze","Zip":"50121"}
+ecjp_load_item - 432: Loaded item token of type OBJECT, size 115, value: {"Name":"Michelangelo","Surname":"Buonarroti","Age":52,"Address":"Corso Venezia 10","City":"Torino","Zip":"10124"}
+ecjp_load_item - 432: Loaded item token of type OBJECT, size 101, value: {"Name":"Enrico","Surname":"Fermi","Age":30,"Address":"Via Vesuvio 5","City":"Napoli","Zip":"80121"}
+ecjp_check_and_load_2 - 1418: Allocated memory used: 693 bytes
+Item read successfully.
+Type = OBJECT, Value = {"Name":"Giuseppe","Surname":"Garibaldi","Age":48,"Address":"Via Roma 1","City":"Roma","Zip":"00118"}
+Parsing nested object:
+ecjp_load_item - 432: Loaded item token of type KEY_VALUE_PAIR, size 18, value: "Name":"Giuseppe"
+ecjp_load_item - 432: Loaded item token of type KEY_VALUE_PAIR, size 22, value: "Surname":"Garibaldi"
+ecjp_load_item - 432: Loaded item token of type KEY_VALUE_PAIR, size 9, value: "Age":48
+ecjp_load_item - 432: Loaded item token of type KEY_VALUE_PAIR, size 23, value: "Address":"Via Roma 1"
+ecjp_load_item - 432: Loaded item token of type KEY_VALUE_PAIR, size 14, value: "City":"Roma"
+ecjp_load_item - 432: Loaded item token of type KEY_VALUE_PAIR, size 14, value: "Zip":"00118"
+ecjp_check_and_load_2 - 1418: Allocated memory used: 292 bytes
+  Item read successfully.
+  Type = KEY_VALUE_PAIR, Value = "Name":"Giuseppe"
+    Key = '"Name"', Value = '"Giuseppe"'
+  Item read successfully.
+  Type = KEY_VALUE_PAIR, Value = "Surname":"Garibaldi"
+    Key = '"Surname"', Value = '"Garibaldi"'
+  Item read successfully.
+  Type = KEY_VALUE_PAIR, Value = "Age":48
+    Key = '"Age"', Value = '48'
+  Item read successfully.
+  Type = KEY_VALUE_PAIR, Value = "Address":"Via Roma 1"
+    Key = '"Address"', Value = '"Via Roma 1"'
+  Item read successfully.
+  Type = KEY_VALUE_PAIR, Value = "City":"Roma"
+    Key = '"City"', Value = '"Roma"'
+  Item read successfully.
+  Type = KEY_VALUE_PAIR, Value = "Zip":"00118"
+    Key = '"Zip"', Value = '"00118"'  
+...
+...
+```
 
 ## Tests  
 
@@ -596,11 +648,27 @@ $ ./run_test.sh
 ```
 The script launches the program *example_ecjp_3* with each of the files in the *tests* folder as an argument and print the result: PASS or FAIL.  
 To change the program to lauch, change the script *run_test.sh*.  
+The output is like this:
+```sh
+Running ../build/src/example_ecjp_3 with ../tests/invalid_01_trailing_comma.json ... [PASS]
+Running ../build/src/example_ecjp_3 with ../tests/invalid_02_single_quotes.json ... [PASS]
+Running ../build/src/example_ecjp_3 with ../tests/invalid_03_unquoted_key.json ... [PASS]
+Running ../build/src/example_ecjp_3 with ../tests/invalid_04_leading_zero.json ... [PASS]
+Running ../build/src/example_ecjp_3 with ../tests/invalid_05_bad_escape.json ... [PASS]
+....
+Running ../build/src/example_ecjp_3 with ../tests/valid_01_simple.json ... [PASS]
+Running ../build/src/example_ecjp_3 with ../tests/valid_02_array.json ... [PASS]
+Running ../build/src/example_ecjp_3 with ../tests/valid_03_unicode.json ... [PASS]
+Running ../build/src/example_ecjp_3 with ../tests/valid_04_numbers.json ... [PASS]
+Running ../build/src/example_ecjp_3 with ../tests/valid_05_nested.json ... [PASS]
+...
+```
 
 ## Remarks  
 
 At the moment there are these TODOS:
 - the compilation process produce library and executables with debug symbols, no stripped. I need to add RELEASE compilation.
+- documentation of key-position implementation
 - the test *valid_11_deep_nesting.json* pass only with compilation for CPU due the limit of MCU parsing.
 - the test *valid_03_unicode.json* pass but the parsing fail the value of key "escaped" missing the characters "\n" e "\t" inside the string value.
 - the test *valid_08_escaped_unicode.json* pass but the parsing of the value of the keys "escapedQuotes" and "slashes" are not correct. Need to be fixed.  
